@@ -1,0 +1,90 @@
+services:
+
+  # ── Databases ────────────────────────────────────────────────────────────────
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-dmtc}
+      MYSQL_USER: ${MYSQL_USER:-dmtc}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./scripts/init-mysql.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  solr:
+    image: solr:9.6
+    volumes:
+      - solr_data:/var/solr
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8983/solr/admin/info/system > /dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # One-shot init container — creates all Solr cores, then exits.
+  # Runs once after Solr is healthy; docker compose will not restart it.
+  solr-init:
+    image: curlimages/curl:latest
+    depends_on:
+      solr:
+        condition: service_healthy
+    volumes:
+      - ./scripts/init-solr.sh:/init-solr.sh:ro
+    entrypoint: ["/bin/sh", "/init-solr.sh"]
+    restart: "no"
+
+  # ── Application services ──────────────────────────────────────────────────────
+
+  api:
+    build:
+      context: ../imls-dmt-api
+      dockerfile: Dockerfile
+    environment:
+      FLASK_SECRET_KEY: ${FLASK_SECRET_KEY}
+      FLASK_DEBUG: ${FLASK_DEBUG:-0}
+      SOLR_ADDRESS: http://solr:8983/solr/
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-dmtc}:${MYSQL_PASSWORD}@mysql/${MYSQL_DATABASE:-dmtc}
+      RSS_EMAIL: ${RSS_EMAIL:-noreply@example.com}
+      ORCID_CLIENT_ID: ${ORCID_CLIENT_ID:-}
+      ORCID_CLIENT_SECRET: ${ORCID_CLIENT_SECRET:-}
+      ORCID_AUTH_URL: ${ORCID_AUTH_URL:-https://orcid.org/oauth/authorize}
+      ORCID_EXCHANGE_URL: ${ORCID_EXCHANGE_URL:-https://orcid.org/oauth/token}
+      ORCID_REDIRECT_URL: ${ORCID_REDIRECT_URL:-http://localhost/api/orcid_sign_in/orcid_callback}
+      FRONT_END_URL: ${FRONT_END_URL:-http://localhost}
+      API_KEYS: ${API_KEYS:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      solr-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    # API is NOT exposed directly — all traffic goes through the ui/nginx proxy.
+    # To expose the API port for direct testing during development, add to
+    # docker-compose.override.yml:
+    #   ports:
+    #     - "5000:5000"
+
+  ui:
+    build:
+      context: ../userinterface/ui
+      dockerfile: Dockerfile
+      args:
+        VUE_APP_API_BASE: ${VUE_APP_API_BASE:-}
+    ports:
+      - "${UI_PORT:-80}:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  solr_data:

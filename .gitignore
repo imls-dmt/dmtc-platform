@@ -1,0 +1,5 @@
+# Local environment — contains secrets, never commit
+.env
+
+# Docker override for local customizations
+docker-compose.override.yml

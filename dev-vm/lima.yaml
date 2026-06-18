@@ -112,36 +112,34 @@ provision:
       # Claude Code
       npm install -g @anthropic-ai/claude-code
 
-      cat <<'BANNER'
-
-════════════════════════════════════════════════════════════════════════
-DMTC VM provisioning complete.
-
-Open a shell:   limactl shell dmtc
-
-Then inside the VM:
-  1. Clone repos:
-       mkdir -p ~/Repos/DMTC && cd ~/Repos/DMTC
-       git clone https://github.com/imls-dmt/dmtc-platform.git
-       git clone https://github.com/imls-dmt/imls-dmt-api.git
-       git clone https://github.com/imls-dmt/userinterface.git
-       cd dmtc-platform && git checkout devel
-
-  2. Create env files:
-       cp .env.dev.example .env.dev   # then fill in secrets
-
-  3. Start dev stack:
-       newgrp docker   # activate docker group without logout
-       make dev-up
-
-  4. Authenticate Claude Code:
-       export ANTHROPIC_API_KEY=sk-ant-...
-       claude   # opens a session in the current directory
-
-Ports forwarded to your Mac:
-  http://localhost:8082   Vue dev UI
-  http://localhost:5001   Flask API
-  localhost:8984          Solr
-  localhost:3307          MySQL
-════════════════════════════════════════════════════════════════════════
-BANNER
+      echo ""
+      echo "================================================================"
+      echo "DMTC VM provisioning complete."
+      echo ""
+      echo "Open a shell:   limactl shell dmtc"
+      echo ""
+      echo "Then inside the VM:"
+      echo "  1. Clone repos:"
+      echo "       mkdir -p ~/Repos/DMTC && cd ~/Repos/DMTC"
+      echo "       git clone https://github.com/imls-dmt/dmtc-platform.git"
+      echo "       git clone https://github.com/imls-dmt/imls-dmt-api.git"
+      echo "       git clone https://github.com/imls-dmt/userinterface.git"
+      echo "       cd dmtc-platform && git checkout devel"
+      echo ""
+      echo "  2. Create env files:"
+      echo "       cp .env.dev.example .env.dev   # then fill in secrets"
+      echo ""
+      echo "  3. Start dev stack:"
+      echo "       newgrp docker   # activate docker group without logout"
+      echo "       make dev-up"
+      echo ""
+      echo "  4. Authenticate Claude Code:"
+      echo "       export ANTHROPIC_API_KEY=sk-ant-..."
+      echo "       claude"
+      echo ""
+      echo "Ports forwarded to your Mac:"
+      echo "  http://localhost:8082   Vue dev UI"
+      echo "  http://localhost:5001   Flask API"
+      echo "  localhost:8984          Solr"
+      echo "  localhost:3307          MySQL"
+      echo "================================================================"

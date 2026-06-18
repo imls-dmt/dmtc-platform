@@ -121,12 +121,16 @@ Next steps
 4. Start the dev stack:
      make dev-up
 
-5. Authenticate Claude Code (pick one):
-     export ANTHROPIC_API_KEY=sk-ant-...   # add to ~/.bashrc / ~/.zshrc
-     # or: claude auth login               # browser-based login
+5. Authenticate Claude Code (Pro/Max subscription — no API key needed):
+     claude login
+     # Choose the 'subscription' option, not 'Console / API key'.
+     # IMPORTANT: do NOT set ANTHROPIC_API_KEY in your environment.
+     # If that variable is present it overrides subscription auth and
+     # bills the API separately from your plan.
+     # Verify which auth method is active inside Claude Code with: /status
 
-   Then open a Claude Code session from the dmtc-platform directory:
-     claude
+   Then open a session from the dmtc-platform directory:
+     cd ~/Repos/DMTC/dmtc-platform && claude
 
 Dev stack ports (forwarded to host if using Lima):
   http://localhost:8082  — Vue hot-reload UI

@@ -55,8 +55,17 @@ runcmd:
   # Adjust if your image uses a different username.
   - usermod -aG docker ubuntu
 
-  # Claude Code (installed as the ubuntu user so it lands in their PATH)
-  - su - ubuntu -c "npm install -g @anthropic-ai/claude-code"
+  # Claude Code — configure user-local npm prefix first to avoid permission errors,
+  # then install. The PATH update is written to .bashrc for all future sessions.
+  - >
+    su - ubuntu -c "
+      mkdir -p ~/.npm-global &&
+      npm config set prefix ~/.npm-global &&
+      export PATH=\"\$HOME/.npm-global/bin:\$PATH\" &&
+      grep -qxF 'export PATH=\"\$HOME/.npm-global/bin:\$PATH\"' ~/.bashrc ||
+        echo 'export PATH=\"\$HOME/.npm-global/bin:\$PATH\"' >> ~/.bashrc &&
+      npm install -g @anthropic-ai/claude-code
+    "
 
 final_message: |
   DMTC cloud VM setup complete.
@@ -74,6 +83,9 @@ final_message: |
     newgrp docker
     make dev-up
 
-  Authenticate Claude Code:
-    export ANTHROPIC_API_KEY=sk-ant-...
-    claude
+  Authenticate Claude Code (Pro/Max subscription — no API key needed):
+    claude login
+    # Choose 'subscription', not 'Console / API key'.
+    # Do NOT set ANTHROPIC_API_KEY in your environment — if present it
+    # overrides subscription auth and bills the API separately from your plan.
+    # Verify active auth method inside Claude Code with: /status

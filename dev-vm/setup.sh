@@ -78,6 +78,13 @@ phase_user() {
         sudo usermod -aG docker "$USER"
     fi
 
+    # Configure npm to use a user-local prefix so global installs don't need sudo
+    mkdir -p ~/.npm-global
+    npm config set prefix ~/.npm-global
+    export PATH="$HOME/.npm-global/bin:$PATH"
+    grep -qxF 'export PATH="$HOME/.npm-global/bin:$PATH"' ~/.bashrc \
+        || echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.bashrc
+
     # Claude Code CLI
     log "Installing Claude Code..."
     npm install -g @anthropic-ai/claude-code

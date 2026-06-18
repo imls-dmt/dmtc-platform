@@ -1,5 +1,10 @@
-# Local environment — contains secrets, never commit
+# Local environment files — contain secrets, never commit
 .env
+.env.dev
+.env.test
+
+# Production sync credentials
+scripts/.env.prod-sync
 
 # Docker override for local customizations
 docker-compose.override.yml

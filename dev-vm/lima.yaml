@@ -26,10 +26,12 @@
 # Falls back to qemu automatically on older macOS where vz is unavailable.
 vmType: vz
 
-# Rosetta allows x86_64 Docker images to run on Apple Silicon if needed.
-rosetta:
-  enabled: true
-  binfmt: true
+vmOpts:
+  vz:
+    # Rosetta allows x86_64 Docker images to run on Apple Silicon if needed.
+    rosetta:
+      enabled: true
+      binfmt: true
 
 # ── Resources ─────────────────────────────────────────────────────────────────
 cpus: 4

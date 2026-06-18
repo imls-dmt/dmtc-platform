@@ -66,6 +66,27 @@ sync-db-test: .env.test scripts/.env.prod-sync  ## Sync production DB snapshot i
 	@echo "Syncing production DB → test stack..."
 	@./scripts/sync-db-from-prod.sh test
 
+# ── Lima VM (macOS only) ──────────────────────────────────────────────────────
+.PHONY: vm-start
+vm-start:  ## Create and start the Lima dev VM (runs provisioning on first start)
+	limactl start --name=dmtc dev-vm/lima.yaml
+
+.PHONY: vm-shell
+vm-shell:  ## Open a shell inside the Lima VM
+	limactl shell dmtc
+
+.PHONY: vm-stop
+vm-stop:  ## Stop the Lima VM (data preserved)
+	limactl stop dmtc
+
+.PHONY: vm-ssh-config
+vm-ssh-config:  ## Print SSH config snippet for VS Code Remote-SSH / manual SSH
+	@limactl show-ssh --format=config dmtc
+
+.PHONY: vm-status
+vm-status:  ## Show Lima VM status
+	limactl list dmtc
+
 # ── Env file guards ───────────────────────────────────────────────────────────
 .env.dev:
 	@echo "ERROR: .env.dev not found. Copy .env.dev.example and fill in values:" >&2

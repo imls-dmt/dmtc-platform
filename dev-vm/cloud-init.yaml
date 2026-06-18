@@ -1,0 +1,79 @@
+#cloud-config
+# DMTC development environment — cloud-init user-data
+#
+# Use this when launching a cloud VM (AWS, GCP, DigitalOcean, Linode, etc.)
+# or when provisioning a machine with Ubuntu 22.04 or 24.04 that supports
+# cloud-init (most modern cloud images do).
+#
+# On a cloud provider:
+#   Paste the content of this file into the "User data" field when creating
+#   the instance.  The script runs once automatically on first boot.
+#
+# On an existing Linux server (cloud-init not available):
+#   Use dev-vm/setup.sh directly instead:
+#     sudo bash setup.sh system
+#     bash setup.sh user
+#
+# Resources recommended for comfortable development:
+#   4 vCPU, 8 GB RAM, 60 GB disk — Ubuntu 22.04 or 24.04, AMD64 or ARM64
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+  - git
+  - make
+  - wget
+  - unzip
+  - jq
+  - openssh-client
+  - mysql-client
+
+runcmd:
+  # Docker Engine
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  - chmod a+r /etc/apt/keyrings/docker.gpg
+  - >
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg]
+    https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable"
+    > /etc/apt/sources.list.d/docker.list
+  - apt-get update -qq
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  - systemctl enable --now docker
+
+  # Node.js 20 LTS
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  - apt-get install -y nodejs
+
+  # Add the default non-root user to the docker group.
+  # cloud-init sets the default_user; on Ubuntu cloud images it is 'ubuntu'.
+  # Adjust if your image uses a different username.
+  - usermod -aG docker ubuntu
+
+  # Claude Code (installed as the ubuntu user so it lands in their PATH)
+  - su - ubuntu -c "npm install -g @anthropic-ai/claude-code"
+
+final_message: |
+  DMTC cloud VM setup complete.
+
+  Connect:
+    ssh ubuntu@<instance-ip>
+
+  Then:
+    mkdir -p ~/Repos/DMTC && cd ~/Repos/DMTC
+    git clone https://github.com/imls-dmt/dmtc-platform.git
+    git clone https://github.com/imls-dmt/imls-dmt-api.git
+    git clone https://github.com/imls-dmt/userinterface.git
+    cd dmtc-platform && git checkout devel
+    cp .env.dev.example .env.dev   # fill in secrets
+    newgrp docker
+    make dev-up
+
+  Authenticate Claude Code:
+    export ANTHROPIC_API_KEY=sk-ant-...
+    claude

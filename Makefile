@@ -80,8 +80,8 @@ vm-stop:  ## Stop the Lima VM (data preserved)
 	limactl stop dmtc
 
 .PHONY: vm-ssh-config
-vm-ssh-config:  ## Print SSH config snippet for VS Code Remote-SSH / manual SSH
-	@limactl show-ssh --format=config dmtc
+vm-ssh-config:  ## Print SSH command for connecting to the VM (VS Code Remote-SSH / manual SSH)
+	@echo "ssh -F $$HOME/.lima/dmtc/ssh.config lima-dmtc"
 
 .PHONY: vm-status
 vm-status:  ## Show Lima VM status

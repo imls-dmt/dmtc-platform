@@ -11,8 +11,7 @@
 #   limactl shell dmtc
 #
 # SSH directly (e.g. for VS Code Remote-SSH):
-#   limactl show-ssh --format=config dmtc >> ~/.ssh/config
-#   ssh lima-dmtc
+#   ssh -F ~/.lima/dmtc/ssh.config lima-dmtc
 #
 # Stop / start:
 #   limactl stop dmtc

@@ -8,3 +8,8 @@ scripts/.env.prod-sync
 
 # Docker override for local customizations
 docker-compose.override.yml
+
+# Production Solr exports — contain real prod documents/PII, never commit
+*.json.export
+dmtc-solr-export*/
+**/dmtc-solr-export*.tgz

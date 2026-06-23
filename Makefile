@@ -74,6 +74,24 @@ sync-db-test: .env.test scripts/.env.prod-sync  ## Sync production DB snapshot i
 	@echo "Syncing production DB → test stack..."
 	@./scripts/sync-db-from-prod.sh test
 
+# ── Backups ───────────────────────────────────────────────────────────────────
+.PHONY: backup-memory
+backup-memory:  ## Tarball the Claude memory dir off to DEST (default $HOME) for ephemeral-VM safety
+	@DMTC_DIR=$$(cd "$(CURDIR)/.." && pwd); \
+	SLUG=$$(printf '%s' "$$DMTC_DIR" | sed 's/[^a-zA-Z0-9]/-/g'); \
+	MEMDIR="$$HOME/.claude/projects/$$SLUG/memory"; \
+	if [ ! -d "$$MEMDIR" ]; then \
+	  echo "Derived path $$MEMDIR not found; falling back to most-populated *Repos-DMTC memory dir." >&2; \
+	  MEMDIR=$$(for d in $$HOME/.claude/projects/*Repos-DMTC/memory; do [ -d "$$d" ] && printf '%s %s\n' "$$(ls -1 "$$d" | wc -l)" "$$d"; done | sort -rn | head -1 | cut -d' ' -f2-); \
+	fi; \
+	if [ -z "$$MEMDIR" ] || [ ! -d "$$MEMDIR" ]; then echo "ERROR: Claude memory dir not found" >&2; exit 1; fi; \
+	DEST=$${DEST:-$$HOME}; \
+	OUT="$$DEST/dmtc-claude-memory-$$(date +%Y%m%d).tgz"; \
+	tar czf "$$OUT" -C "$$(dirname "$$MEMDIR")" memory; \
+	echo "Backed up $$MEMDIR ($$(ls -1 "$$MEMDIR" | wc -l | tr -d ' ') files)"; \
+	echo "  -> $$OUT  ($$(du -h "$$OUT" | cut -f1))"; \
+	echo "  copy off-VM, e.g.:  scp <vm>:$$OUT ."
+
 # ── Lima VM (macOS only) ──────────────────────────────────────────────────────
 .PHONY: vm-start
 vm-start:  ## Create and start the Lima dev VM (runs provisioning on first start)

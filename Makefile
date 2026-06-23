@@ -27,8 +27,12 @@ dev-logs:  ## Stream logs from the dev stack
 	$(DEV_COMPOSE) logs -f
 
 .PHONY: dev-reindex
-dev-reindex: .env.dev  ## Trigger a full Solr reindex on the dev stack
+dev-reindex: .env.dev  ## Trigger a full Solr reindex on the dev stack (needs admin login)
 	@./scripts/reindex.sh "http://localhost:$$(grep DEV_UI_PORT .env.dev | cut -d= -f2)" "$(DMTC_ADMIN_USER)" "$(DMTC_ADMIN_PASS)"
+
+.PHONY: seed-solr-dev
+seed-solr-dev: .env.dev  ## Bootstrap-seed dev Solr from MySQL blobs (no auth; run after sync-db-dev)
+	@./scripts/seed-solr.sh dev
 
 # ── Test stack ────────────────────────────────────────────────────────────────
 .PHONY: test-up
@@ -52,8 +56,12 @@ test-logs:  ## Stream logs from the test stack
 	$(TEST_COMPOSE) logs -f
 
 .PHONY: test-reindex
-test-reindex: .env.test  ## Trigger a full Solr reindex on the test stack
+test-reindex: .env.test  ## Trigger a full Solr reindex on the test stack (needs admin login)
 	@./scripts/reindex.sh "http://localhost:$$(grep TEST_UI_PORT .env.test | cut -d= -f2)" "$(DMTC_ADMIN_USER)" "$(DMTC_ADMIN_PASS)"
+
+.PHONY: seed-solr-test
+seed-solr-test: .env.test  ## Bootstrap-seed test Solr from MySQL blobs (no auth; run after sync-db-test)
+	@./scripts/seed-solr.sh test
 
 # ── Database sync ─────────────────────────────────────────────────────────────
 .PHONY: sync-db-dev

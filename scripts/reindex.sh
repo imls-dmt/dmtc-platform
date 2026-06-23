@@ -20,14 +20,17 @@ echo "→ Logging in as $ADMIN_USER..."
 COOKIE_JAR="$(mktemp /tmp/dmtc-cookies-XXXXXX)"
 trap 'rm -f "$COOKIE_JAR"' EXIT
 
-HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+# /api/login_json keys the credential as "username" (matched against the Solr
+# user "name" field) and returns HTTP 200 for both good and bad logins, so we
+# must inspect the body rather than the status code.
+LOGIN_BODY=$(curl -s \
     -c "$COOKIE_JAR" \
-    -X POST "$API/user/login/" \
+    -X POST "$API/login_json" \
     -H "Content-Type: application/json" \
-    -d "{\"email\":\"$ADMIN_USER\",\"password\":\"$ADMIN_PASS\"}")
+    -d "{\"username\":\"$ADMIN_USER\",\"password\":\"$ADMIN_PASS\"}")
 
-if [[ "$HTTP_STATUS" != "200" ]]; then
-    echo "ERROR: Login failed (HTTP $HTTP_STATUS)." >&2
+if [[ "$LOGIN_BODY" != *'"status":"success"'* && "$LOGIN_BODY" != *'"status": "success"'* ]]; then
+    echo "ERROR: Login failed: $LOGIN_BODY" >&2
     exit 1
 fi
 echo "   Login successful."
@@ -35,7 +38,7 @@ echo "   Login successful."
 echo "→ Triggering reindex at $API/admin/reindex/..."
 REINDEX_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
     -b "$COOKIE_JAR" \
-    -X POST "$API/admin/reindex/")
+    -X GET "$API/admin/reindex/")
 
 if [[ "$REINDEX_STATUS" == "200" || "$REINDEX_STATUS" == "202" ]]; then
     echo "   Reindex triggered (HTTP $REINDEX_STATUS). Solr cores are rebuilding."

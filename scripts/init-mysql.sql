@@ -34,3 +34,30 @@ CREATE TABLE IF NOT EXISTS tokens (
     uuid  VARCHAR(40),
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Backup tables for the formerly Solr-only cores. Solr remains primary; these
+-- hold a JSON-blob copy kept in sync by solr_to_mysql() for disaster recovery
+-- and reproducible seeding. (timestamps is intentionally not backed.)
+CREATE TABLE IF NOT EXISTS questions (
+    id   VARCHAR(36)  NOT NULL,
+    value MEDIUMTEXT  NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS question_groups (
+    id   VARCHAR(36)  NOT NULL,
+    value MEDIUMTEXT  NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS surveys (
+    id   VARCHAR(36)  NOT NULL,
+    value MEDIUMTEXT  NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS answers (
+    id   VARCHAR(36)  NOT NULL,
+    value MEDIUMTEXT  NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

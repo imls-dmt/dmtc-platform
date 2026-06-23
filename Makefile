@@ -34,6 +34,10 @@ dev-reindex: .env.dev  ## Trigger a full Solr reindex on the dev stack (needs ad
 seed-solr-dev: .env.dev  ## Bootstrap-seed dev Solr from MySQL blobs (no auth; run after sync-db-dev)
 	@./scripts/seed-solr.sh dev
 
+.PHONY: backup-solr-dev
+backup-solr-dev: .env.dev  ## Back up dev Solr-primary cores (questions/surveys/answers/...) into MySQL
+	@./scripts/sync-solr-to-mysql.sh dev
+
 # ── Test stack ────────────────────────────────────────────────────────────────
 .PHONY: test-up
 test-up: .env.test  ## Start the test stack (production-like builds)
@@ -62,6 +66,10 @@ test-reindex: .env.test  ## Trigger a full Solr reindex on the test stack (needs
 .PHONY: seed-solr-test
 seed-solr-test: .env.test  ## Bootstrap-seed test Solr from MySQL blobs (no auth; run after sync-db-test)
 	@./scripts/seed-solr.sh test
+
+.PHONY: backup-solr-test
+backup-solr-test: .env.test  ## Back up test Solr-primary cores into MySQL
+	@./scripts/sync-solr-to-mysql.sh test
 
 # ── Database sync ─────────────────────────────────────────────────────────────
 .PHONY: sync-db-dev

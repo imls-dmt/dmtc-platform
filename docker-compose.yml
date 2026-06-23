@@ -20,10 +20,15 @@ services:
       start_period: 30s
 
   solr:
-    image: solr:9.6
+    # Pinned to match production (Solr 8.11.1). The canonical configsets under
+    # solr/configsets/ are extracted from prod and use luceneMatchVersion 7.7.2
+    # / 8.11.1 plus contrib libs that will not load on Solr 9.x. A Solr 8→9
+    # upgrade is tracked as a separate modernization task.
+    image: solr:8.11.1
     volumes:
       - solr_data:/var/solr
       - ./scripts/init-solr-configset.sh:/docker-entrypoint-initdb.d/init-solr-configset.sh:ro
+      - ./solr/configsets:/dmtc-configsets:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8983/solr/admin/info/system > /dev/null"]
       interval: 15s

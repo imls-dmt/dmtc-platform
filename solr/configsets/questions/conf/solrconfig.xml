@@ -72,17 +72,10 @@
        The examples below can be used to load some solr-contribs along
        with their external dependencies.
     -->
-  <lib dir="${solr.install.dir:../../../..}/contrib/extraction/lib" regex=".*\.jar" />
-  <lib dir="${solr.install.dir:../../../..}/dist/" regex="solr-cell-\d.*\.jar" />
-
-  <lib dir="${solr.install.dir:../../../..}/contrib/clustering/lib/" regex=".*\.jar" />
-  <lib dir="${solr.install.dir:../../../..}/dist/" regex="solr-clustering-\d.*\.jar" />
-
-  <lib dir="${solr.install.dir:../../../..}/contrib/langid/lib/" regex=".*\.jar" />
-  <lib dir="${solr.install.dir:../../../..}/dist/" regex="solr-langid-\d.*\.jar" />
-
-  <lib dir="${solr.install.dir:../../../..}/contrib/velocity/lib" regex=".*\.jar" />
-  <lib dir="${solr.install.dir:../../../..}/dist/" regex="solr-velocity-\d.*\.jar" />
+  <!-- DMTC security hardening: removed contrib lib loads (extraction/cell,
+       clustering, langid, velocity). They are unused by the application (which
+       talks to Solr only via pysolr /select and /update), and Velocity + Tika
+       are well-known Solr RCE vectors. No schema field type depends on them. -->
   <!-- an exact 'path' can be used instead of a 'dir' to specify a
        specific jar file.  This will cause a serious error to be logged
        if it can't be loaded.
@@ -773,13 +766,10 @@
        (SearchHandler) can be registered multiple times with different
        names (and different init parameters)
     -->
-  <requestHandler name="/browse" class="solr.SearchHandler" useParams="query,facets,velocity,browse">
-    <lst name="defaults">
-      <str name="echoParams">explicit</str>
-    </lst>
-  </requestHandler>
+  <!-- DMTC security hardening: removed the Velocity-backed /browse UI handler
+       (unused; required the removed velocity contrib). -->
 
-  <initParams path="/update/**,/query,/select,/tvrh,/elevate,/spell,/browse">
+  <initParams path="/update/**,/query,/select,/tvrh,/elevate,/spell">
     <lst name="defaults">
       <str name="df">_text_</str>
     </lst>
@@ -790,15 +780,9 @@
        http://wiki.apache.org/solr/ExtractingRequestHandler
 
     -->
-  <requestHandler name="/update/extract"
-                  startup="lazy"
-                  class="solr.extraction.ExtractingRequestHandler" >
-    <lst name="defaults">
-      <str name="lowernames">true</str>
-      <str name="fmap.meta">ignored_</str>
-      <str name="fmap.content">_text_</str>
-    </lst>
-  </requestHandler>
+  <!-- DMTC security hardening: removed the Solr Cell /update/extract handler
+       (ExtractingRequestHandler / Tika). Unused by the app and an RCE surface;
+       depended on the removed extraction/cell contrib. -->
 
   <!-- Search Components
 
@@ -1297,11 +1281,8 @@
   <!--
      Custom response writers can be declared as needed...
     -->
-  <queryResponseWriter name="velocity" class="solr.VelocityResponseWriter" startup="lazy">
-    <str name="template.base.dir">${velocity.template.base.dir:}</str>
-    <str name="solr.resource.loader.enabled">${velocity.solr.resource.loader.enabled:true}</str>
-    <str name="params.resource.loader.enabled">${velocity.params.resource.loader.enabled:false}</str>
-  </queryResponseWriter>
+  <!-- DMTC security hardening: removed the Velocity response writer — a known
+       RCE vector and unused (the app reads responses via wt=json). -->
 
   <!-- XSLT response writer transforms the XML output by any xslt file found
        in Solr's conf/xslt directory.  Changes to xslt files are checked for

@@ -15,3 +15,6 @@ dmtc-solr-export*/
 **/dmtc-solr-export*.tgz
 .env.prod
 .env.devsite
+
+# macOS
+.DS_Store

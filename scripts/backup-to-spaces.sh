@@ -25,8 +25,10 @@ case "$TARGET" in
 esac
 [ -f "$ENV_FILE" ] || { echo "ERROR: $ENV_FILE not found" >&2; exit 1; }
 
-# shellcheck disable=SC1090
-set -a; source "$ENV_FILE"; set +a
+set -a
+# shellcheck source=/dev/null
+source "$ENV_FILE"
+set +a
 : "${SPACES_BUCKET:?SPACES_BUCKET missing in $ENV_FILE}"
 : "${SPACES_REGION:?SPACES_REGION missing in $ENV_FILE}"
 : "${SPACES_ACCESS_KEY:?SPACES_ACCESS_KEY missing in $ENV_FILE}"

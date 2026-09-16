@@ -182,7 +182,65 @@ memory and disk at 85%.
 | Notifications | Email only, to kbene@karlbenedict.com. DO only accepts team-member addresses: add it under Settings > Team (or make it the account email) and then run `doctl monitoring uptime alert update ... --emails kbene@karlbenedict.com` for the four alerts |
 | Development site | Same droplet, separate compose project (`make devsite-up`), served by the production Caddy on dmtc-devel.org |
 | UNM host access | Available (SSH) for the data export |
-| ORCID client secret | On the UNM host; to be located. Current auth model under review (see ORCID section when added) |
+| ORCID client secret | On the UNM host; to be located. Auth model reviewed below |
+
+## ORCID authentication: current options and what to change
+
+Reviewed against ORCID's live documentation and discovery document on
+2026-09-16 (sources in the footnotes of this section).
+
+**What has changed since the integration was built.** ORCID still has only two
+tiers, Public (free, non-members) and Member (paid). The Public API remains
+free and remains the recommended way to offer "Sign in with ORCID". Changes
+that matter to DMTC: Public API traffic is now capped at 12 requests/second
+and 100,000 reads per day per client (Feb 2025), the Public API terms were
+revised in Oct 2024 to non-commercial use only (DMTC qualifies), a
+self-service Developer Tools page now manages redirect URIs (July 2023), and
+ORCID replaced its OAuth server in April 2026 (same protocol, new error
+payloads). PKCE is still not supported; the implicit flow is still permitted
+but not recommended. API v3.0 is the recommended version; v2.1, which DMTC
+reads for the user's name, is still served but is a legacy version ORCID
+reserves the right to charge for once retired.
+
+**Governance point.** Public API credentials are tied to one individual's
+ORCID record and cannot be transferred. Whoever registered client
+`APP-SCZZMT87KMLN7QZM` is the only person who can edit its redirect URIs. Confirm
+who that is before cutover.
+
+**Recommendation.** Keep the current 3-legged authorization-code flow with
+`scope=openid` and server-side `client_secret_post`; it is exactly what ORCID
+recommends for non-members and nothing better is on offer. Make three changes
+in the API:
+
+1. Stop calling `pub.orcid.org/v2.1/{orcid}/record` after login. The token
+   response already carries `orcid` and `name`, and the `id_token` (RS256,
+   verifiable against `https://orcid.org/oauth/jwks`) carries `sub`,
+   `given_name`, `family_name`. Use those, or `GET https://orcid.org/oauth/userinfo`
+   with the bearer token. This removes the v2.1 dependency entirely.
+2. Send a CSRF-bound `state` and a `nonce` on the authorize request and verify
+   both on callback. This is the standards-based mitigation ORCID expects in
+   the absence of PKCE.
+3. Read the ORCID issuer from configuration so the dev site can use the
+   sandbox (`https://sandbox.orcid.org`, free, separate client credentials,
+   accepts `http://localhost` redirect URIs) while production uses
+   `https://orcid.org`.
+
+**Redirect URIs for the move.** In Developer Tools (pencil icon on the DMTC
+client, "Add another redirect URI"), register the full callback paths:
+`https://www.dmtc-prod.org/api/orcid_sign_in/orcid_callback/www.dmtc-prod.org`
+and `https://www.dmtc-devel.org/api/orcid_sign_in/orcid_callback/www.dmtc-devel.org`.
+Subdomains are separate registrations, wildcards are not allowed, HTTPS only.
+Keep the legacy ESIP callback registered until cutover is complete.
+
+Sources: Public API overview <https://info.orcid.org/documentation/features/public-api/>;
+rate limits <https://info.orcid.org/faq/what-are-the-api-limits/>; terms
+<https://info.orcid.org/public-client-terms-of-service/>; scopes
+<https://info.orcid.org/ufaqs/what-is-an-oauth-scope-and-which-scopes-does-orcid-support/>;
+redirect URIs <https://info.orcid.org/ufaqs/how-do-redirect-uris-work/>;
+version policy <https://info.orcid.org/ufaqs/sunsetting-api-version-2/>;
+OIDC reference <https://github.com/ORCID/ORCID-Source/blob/main/orcid-web/ORCID_AUTH_WITH_OPENID_CONNECT.md>;
+discovery <https://orcid.org/.well-known/openid-configuration>;
+sandbox <https://info.orcid.org/documentation/integration-guide/sandbox-testing-server/>.
 
 ## Still to do before cutover
 

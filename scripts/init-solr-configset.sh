@@ -22,7 +22,7 @@ if [ -d /dmtc-configsets ]; then
         [ -d "$src" ] || continue
         name="$(basename "$src")"
         # Refresh on every start so repo edits to schemas take effect.
-        rm -rf "$CONFIGSETS_HOME/$name"
+        rm -rf "${CONFIGSETS_HOME:?}/$name"
         cp -r "$src" "$CONFIGSETS_HOME/$name"
         echo "init-solr-configset: installed configset '$name'."
     done

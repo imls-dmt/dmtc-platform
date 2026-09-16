@@ -12,8 +12,10 @@ for core in $CORES; do
     if [ "$status" -gt 0 ]; then
         echo "Core '${core}' already exists — skipping."
     else
-        echo "Creating core '${core}'..."
-        curl -sf "${SOLR_URL}/admin/cores?action=CREATE&name=${core}&instanceDir=${core}&configSet=_default" \
+        # Each core has a dedicated configset of the same name (the canonical
+        # DMTC schema installed by init-solr-configset.sh).
+        echo "Creating core '${core}' (configSet=${core})..."
+        curl -sf "${SOLR_URL}/admin/cores?action=CREATE&name=${core}&instanceDir=${core}&configSet=${core}" \
             && echo "  → created." \
             || echo "  → failed (may already exist or configset missing — check Solr logs)."
     fi

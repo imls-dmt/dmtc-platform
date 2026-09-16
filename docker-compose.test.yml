@@ -1,0 +1,16 @@
+# Testing overrides — production-like builds on alternate ports.
+# No volume mounts; gunicorn and nginx run as they would in production.
+# Mirrors what will be deployed, making it suitable for pre-merge validation.
+#
+# Usage:  make test-up
+# Manual: docker compose -p dmtc-test -f docker-compose.yml -f docker-compose.test.yml --env-file .env.test up
+
+services:
+
+  api:
+    environment:
+      FLASK_DEBUG: "0"
+
+  ui:
+    ports:
+      - "${TEST_UI_PORT:-8081}:80"

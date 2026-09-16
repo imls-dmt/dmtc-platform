@@ -1,0 +1,45 @@
+# Development overrides — layered on top of docker-compose.yml.
+# Source code is volume-mounted; services use dev servers with live reload.
+# All internal ports are exposed on the host for direct inspection.
+#
+# Usage:  make dev-up
+# Manual: docker compose -p dmtc-dev -f docker-compose.yml -f docker-compose.dev.yml --env-file .env.dev up
+
+services:
+
+  api:
+    # Replace gunicorn with Flask's dev server so the app reloads on file saves.
+    command: flask run --host=0.0.0.0 --port=5000
+    environment:
+      FLASK_APP: dmtclearinghouse.py
+      FLASK_DEBUG: "1"
+    # Mount source directly — edits are live without rebuilding the image.
+    volumes:
+      - ../imls-dmt-api:/app
+    ports:
+      - "${DEV_API_PORT:-5001}:5000"
+
+  ui:
+    build:
+      # Build only the 'dev' stage (npm ci + dev server, no production bundle).
+      target: dev
+    volumes:
+      # Mount source for hot-reload; node_modules stay inside the container.
+      - ../userinterface/ui/src:/app/src
+      - ../userinterface/ui/public:/app/public
+    environment:
+      # Tells vue.config.js to proxy /api/ requests to the API container.
+      DEV_API_PROXY: http://api:5000
+      VUE_APP_API_BASE: ""
+      # Required by Vue CLI dev server to bind on all interfaces inside Docker.
+      HOST: "0.0.0.0"
+    ports:
+      - "${DEV_UI_PORT:-8082}:8080"
+
+  solr:
+    ports:
+      - "${DEV_SOLR_PORT:-8984}:8983"
+
+  mysql:
+    ports:
+      - "${DEV_MYSQL_PORT:-3307}:3306"

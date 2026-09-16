@@ -1,0 +1,96 @@
+#cloud-config
+# DMTC production droplet — cloud-init user-data.
+#
+# Provision with:
+#   doctl compute droplet create dmtc-prod --region nyc3 --size s-4vcpu-8gb \
+#     --image ubuntu-24-04-x64 --ssh-keys <ids> --enable-backups --enable-monitoring \
+#     --user-data-file dev-vm/cloud-init-prod.yaml --tag-names dmtc,prod
+#
+# What this does on first boot: creates the "dmtc" deploy user, installs Docker
+# Engine + compose plugin, rclone (Spaces backups), the DigitalOcean metrics
+# agent and unattended security upgrades; adds a 2 GB swap file; clones the
+# three DMTC repositories into /opt/dmtc; creates the shared "dmtc-edge" Docker
+# network; installs the nightly backup cron. It does NOT start the stack —
+# .env.prod must be written by hand first (see docs/digitalocean-migration.md).
+
+package_update: true
+package_upgrade: true
+
+users:
+  - name: dmtc
+    groups: [sudo, docker]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBDrqzxxBy3Xq6EwLZhsOZ+WfVMDc9oBFZCaIKuaErL9 kbene@unm.edu
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDcUPsbgbf/S/2pQ/H6Pj6fViRBlVPRj/fbCVAwDZ8cL3NVwbWJ6q4nf55PkNJPr0z9hegcQOF+DM3FhqYroAUJqUuRfjYSA0bHSoZMs1g0ZbCIxYJlwjdNC12IMggQQKMp7WVzYNLQHJjOmPZpLXgCRL3Kx4OCl8Ho5nWZdIDe5de+yeg7KXXhOa5MSRnzhgZSh6ltC1jvRZHVYF1uMTuAPEqAxFXNtuq+bm0djoz+PXBQPJosAJY/Ml8wig4u6JVTZUJ+YjejADBWmpiYoSwyvy+R6g43D53C9XWmuBNQkX9twrdY+oFcxQuztitKcG6pwmXR0BAZokzKh8cyiAInaG8JMmUdTEwQhXKbgJfnupw1fVgQ9wWTDchZOaJKSrUaJ4NLVun3c6ASQYjBprXPSF1aWPIh/0c4BkAtPow4O1wafobSyYLDdoGSra2JxOyc9Hvu/0s4hKpiH4Ovl0qHs30gChBrJwkcuHr2yoA4iIed7A416Tg/Ez0lfB6h8k0= kbene@Karls-iMac.local
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - git
+  - make
+  - jq
+  - rclone
+  - mysql-client
+  - unattended-upgrades
+  - fail2ban
+
+swap:
+  filename: /swapfile
+  size: 2G
+  maxsize: 2G
+
+write_files:
+  - path: /etc/apt/apt.conf.d/50unattended-upgrades-dmtc
+    content: |
+      Unattended-Upgrade::Automatic-Reboot "false";
+      Unattended-Upgrade::Remove-Unused-Dependencies "true";
+  - path: /etc/cron.d/dmtc-backup
+    content: |
+      # Nightly at 03:15 UTC: Solr -> MySQL sync, mysqldump, upload to Spaces.
+      15 3 * * * dmtc cd /opt/dmtc/dmtc-platform && ./scripts/backup-to-spaces.sh prod >> /var/log/dmtc-backup.log 2>&1
+  - path: /etc/logrotate.d/dmtc-backup
+    content: |
+      /var/log/dmtc-backup.log { weekly rotate 8 compress missingok notifempty }
+
+runcmd:
+  # Docker Engine (official repository)
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  - chmod a+r /etc/apt/keyrings/docker.gpg
+  - >
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg]
+    https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable"
+    > /etc/apt/sources.list.d/docker.list
+  - apt-get update -qq
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  - systemctl enable --now docker
+
+  # DigitalOcean metrics agent (droplet CPU/memory/disk graphs and alert policies)
+  - curl -sSL https://repos.insights.digitalocean.com/install.sh | bash
+
+  # Host firewall as a second layer behind the DO cloud firewall
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow OpenSSH
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw allow 443/udp
+  - ufw --force enable
+
+  # Repositories
+  - mkdir -p /opt/dmtc && chown dmtc:dmtc /opt/dmtc
+  - sudo -u dmtc git clone --branch master https://github.com/imls-dmt/imls-dmt-api.git /opt/dmtc/imls-dmt-api
+  - sudo -u dmtc git clone --branch master --recurse-submodules https://github.com/imls-dmt/userinterface.git /opt/dmtc/userinterface
+  - sudo -u dmtc git clone --branch main https://github.com/imls-dmt/dmtc-platform.git /opt/dmtc/dmtc-platform
+  - sudo -u dmtc touch /var/log/dmtc-backup.log || true
+  - touch /var/log/dmtc-backup.log && chown dmtc:dmtc /var/log/dmtc-backup.log
+
+  # Shared network between the prod and devsite compose projects
+  - docker network create dmtc-edge || true
+
+  - systemctl enable --now unattended-upgrades fail2ban
+
+final_message: "DMTC production droplet provisioned in $UPTIME seconds. Next: write /opt/dmtc/dmtc-platform/.env.prod, then 'make prod-up'."

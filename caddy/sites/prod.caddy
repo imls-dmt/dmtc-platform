@@ -1,0 +1,30 @@
+# Production: www.dmtc-prod.org, with the apex redirecting to www.
+
+{$PROD_APEX} {
+	redir https://{$PROD_HOST}{uri} permanent
+}
+
+{$PROD_HOST} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# nginx in the ui container serves the SPA and proxies /api/ to the API.
+	# X-Forwarded-Host is what the API uses to build the ORCID callback.
+	reverse_proxy ui:80 {
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	log {
+		output file /data/access-prod.log {
+			roll_size 50MiB
+			roll_keep 5
+		}
+	}
+}

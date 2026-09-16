@@ -1,0 +1,155 @@
+# DMTC Development VM — Lima template
+# Apple Silicon macOS (uses macOS Virtualization.framework for near-native speed)
+#
+# Prerequisites:
+#   brew install lima
+#
+# Create and start the VM (once):
+#   limactl start --name=dmtc dev-vm/lima.yaml
+#
+# Open a shell in the VM:
+#   limactl shell dmtc
+#
+# SSH directly (e.g. for VS Code Remote-SSH):
+#   ssh -F ~/.lima/dmtc/ssh.config lima-dmtc
+#
+# Stop / start:
+#   limactl stop dmtc
+#   limactl start dmtc
+#
+# Destroy (removes VM and all data inside it):
+#   limactl delete --force dmtc
+
+# ── Hypervisor ────────────────────────────────────────────────────────────────
+# vz = macOS Virtualization.framework — fast, low overhead on Apple Silicon.
+# Falls back to qemu automatically on older macOS where vz is unavailable.
+vmType: vz
+
+vmOpts:
+  vz:
+    # Rosetta allows x86_64 Docker images to run on Apple Silicon if needed.
+    rosetta:
+      enabled: true
+      binfmt: true
+
+# ── Resources ─────────────────────────────────────────────────────────────────
+cpus: 4
+memory: "8GiB"
+disk: "60GiB"
+
+# ── Base image ────────────────────────────────────────────────────────────────
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-arm64.img"
+    arch: "aarch64"
+  # Fallback for Intel Lima (should not occur on Apple Silicon but included for safety)
+  - location: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img"
+    arch: "x86_64"
+
+# ── Mounts ────────────────────────────────────────────────────────────────────
+# No host mounts — repos live inside the VM for full portability.
+# The VM is the single source of truth; move the VM, move everything.
+mounts: []
+
+# ── Port forwarding ───────────────────────────────────────────────────────────
+# Forwarded from the VM guest to the Mac host so you can use your Mac browser.
+portForwards:
+  - guestPort: 8082
+    hostPort: 8082
+    # Dev stack: Vue hot-reload UI
+  - guestPort: 8081
+    hostPort: 8081
+    # Test stack: production-build UI
+  - guestPort: 5001
+    hostPort: 5001
+    # Dev stack: Flask API (direct, for curl/Postman)
+  - guestPort: 8984
+    hostPort: 8984
+    # Dev stack: Solr admin console
+  - guestPort: 3307
+    hostPort: 3307
+    # Dev stack: MySQL (for GUI clients like TablePlus)
+
+# ── Provisioning (runs once on first start) ────────────────────────────────────
+provision:
+
+  # Phase 1: system packages — Docker, Node.js, dev tools (runs as root)
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -euo pipefail
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update -qq
+      apt-get install -y --no-install-recommends \
+          ca-certificates curl gnupg lsb-release \
+          git make wget unzip jq openssh-client mysql-client
+
+      # Docker Engine
+      install -m 0755 -d /etc/apt/keyrings
+      curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+          | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      chmod a+r /etc/apt/keyrings/docker.gpg
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+      https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+          > /etc/apt/sources.list.d/docker.list
+      apt-get update -qq
+      apt-get install -y \
+          docker-ce docker-ce-cli containerd.io \
+          docker-buildx-plugin docker-compose-plugin
+      systemctl enable --now docker
+
+      # Node.js 20 LTS
+      curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+      apt-get install -y nodejs
+
+  # Phase 2: user-level tools (runs as your Lima user, non-root)
+  - mode: user
+    script: |
+      #!/bin/bash
+      set -euo pipefail
+
+      # Add to docker group
+      sudo usermod -aG docker "$USER"
+
+      # Configure npm to use a user-local prefix so global installs don't need sudo
+      mkdir -p ~/.npm-global
+      npm config set prefix ~/.npm-global
+      echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.bashrc
+
+      # Claude Code
+      export PATH="$HOME/.npm-global/bin:$PATH"
+      npm install -g @anthropic-ai/claude-code
+
+      echo ""
+      echo "================================================================"
+      echo "DMTC VM provisioning complete."
+      echo ""
+      echo "Open a shell:   limactl shell dmtc"
+      echo ""
+      echo "Then inside the VM:"
+      echo "  1. Clone repos:"
+      echo "       mkdir -p ~/Repos/DMTC && cd ~/Repos/DMTC"
+      echo "       git clone https://github.com/imls-dmt/dmtc-platform.git"
+      echo "       git clone https://github.com/imls-dmt/imls-dmt-api.git"
+      echo "       git clone https://github.com/imls-dmt/userinterface.git"
+      echo "       cd dmtc-platform && git checkout devel"
+      echo ""
+      echo "  2. Create env files:"
+      echo "       cp .env.dev.example .env.dev   # then fill in secrets"
+      echo ""
+      echo "  3. Start dev stack:"
+      echo "       newgrp docker   # activate docker group without logout"
+      echo "       make dev-up"
+      echo ""
+      echo "  4. Authenticate Claude Code (Pro/Max subscription — no API key needed):"
+      echo "       claude login"
+      echo "       # Choose the 'subscription' option, not 'Console / API key'."
+      echo "       # IMPORTANT: do NOT set ANTHROPIC_API_KEY in your shell — if that"
+      echo "       # variable is set it overrides subscription auth and bills the API."
+      echo "       # Verify active auth method inside Claude Code with: /status"
+      echo ""
+      echo "Ports forwarded to your Mac:"
+      echo "  http://localhost:8082   Vue dev UI"
+      echo "  http://localhost:5001   Flask API"
+      echo "  localhost:8984          Solr"
+      echo "  localhost:3307          MySQL"
+      echo "================================================================"

@@ -1,0 +1,69 @@
+# Production overrides — one droplet, Caddy terminating TLS in front of the
+# ui/nginx container. Nothing but Caddy publishes a port.
+#
+# Usage:  make prod-up          (docker compose -p dmtc-prod \
+#           -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d)
+#
+# The development site (dmtc-devel.org) runs as a second compose project from
+# docker-compose.devsite.yml and joins the shared "dmtc-edge" network so this
+# Caddy can reach it as "ui-devsite". See docs/digitalocean-migration.md.
+
+services:
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL}
+      PROD_HOST: ${PROD_HOST:-www.dmtc-prod.org}
+      PROD_APEX: ${PROD_APEX:-dmtc-prod.org}
+      DEVSITE_HOST: ${DEVSITE_HOST:-www.dmtc-devel.org}
+      DEVSITE_APEX: ${DEVSITE_APEX:-dmtc-devel.org}
+      LEGACY_HOST: ${LEGACY_HOST:-dmtclearinghouse.esipfed.org}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/sites:/etc/caddy/sites:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - default
+      - edge
+    depends_on:
+      - ui
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  ui:
+    # Only Caddy is reachable from outside; drop the base file's port mapping.
+    ports: !reset []
+    restart: always
+
+  api:
+    restart: always
+    environment:
+      FLASK_DEBUG: "0"
+
+  mysql:
+    restart: always
+
+  solr:
+    restart: always
+    environment:
+      # Solr's default heap is 512m; the production index is small but facet
+      # queries over nine cores benefit from headroom on an 8 GB droplet.
+      SOLR_HEAP: ${SOLR_HEAP:-1g}
+
+networks:
+  edge:
+    name: dmtc-edge
+
+volumes:
+  caddy_data:
+  caddy_config:

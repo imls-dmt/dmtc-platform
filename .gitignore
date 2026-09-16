@@ -1,5 +1,20 @@
-# Local environment — contains secrets, never commit
+# Local environment files — contain secrets, never commit
 .env
+.env.dev
+.env.test
+
+# Production sync credentials
+scripts/.env.prod-sync
 
 # Docker override for local customizations
 docker-compose.override.yml
+
+# Production Solr exports — contain real prod documents/PII, never commit
+*.json.export
+dmtc-solr-export*/
+**/dmtc-solr-export*.tgz
+.env.prod
+.env.devsite
+
+# macOS
+.DS_Store

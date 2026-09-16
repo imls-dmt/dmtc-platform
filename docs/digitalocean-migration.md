@@ -1,7 +1,10 @@
 # Migrating DMTC hosting to DigitalOcean
 
-Status: **proposal, 2026-09-16**. Nothing in this document has been provisioned
-except the uptime checks described in the Monitoring section.
+Status: **approved 2026-09-16, repository work complete, droplet not yet
+provisioned.** Decisions taken: region `nyc3`; DO weekly droplet backups;
+DNS stays at Hover; email-only alerts (to kbene@karlbenedict.com once that
+address is added to the DO team); development site on the same droplet as a
+second compose project. Uptime checks exist against the current host.
 
 ## Why move
 
@@ -59,7 +62,22 @@ droplet (ports 8082 etc. behind Caddy on `dmtc-devel.org`). Split it onto a
 separate `s-2vcpu-4gb` droplet (24/mo) only if dev work starts affecting
 production.
 
-## What has to be built in this repository first
+## What has been built in this repository (devel, 2026-09-16)
+
+| Piece | File | Notes |
+|---|---|---|
+| Production compose override | `docker-compose.prod.yml` | Adds Caddy (80/443, TLS, HTTP->HTTPS with path preserved), removes the ui port, `restart: always`, Solr heap 1g |
+| Caddy configuration | `caddy/Caddyfile`, `caddy/sites/prod.caddy`, `caddy/sites/devsite.caddy`, `caddy/sites/legacy.caddy.example` | One file per site; apex names redirect to www; security headers; `X-Forwarded-Host` passed through for ORCID |
+| Development-site override | `docker-compose.devsite.yml` | Second project `dmtc-devsite` with its own MySQL/Solr volumes, joins the `dmtc-edge` network as `ui-devsite`, no published ports |
+| Environment templates | `.env.prod.example`, `.env.devsite.example` | Every API variable plus hostnames, ACME contact, Spaces credentials |
+| Droplet provisioning | `dev-vm/cloud-init-prod.yaml` | `dmtc` deploy user with the account's SSH keys, Docker, rclone, DO metrics agent, ufw, fail2ban, unattended-upgrades, 2 GB swap, repo clones under `/opt/dmtc`, nightly backup cron |
+| Backups | `scripts/backup-to-spaces.sh` | Solr->MySQL sync, `mysqldump`, gzip, rclone upload to Spaces, prune after `BACKUP_RETENTION_DAYS` |
+| Operations | `Makefile` targets `prod-*` and `devsite-*`, `scripts/wait-for-health.sh` | `make prod-deploy` pulls the release branches of all three repos, rebuilds, restarts, waits for `/api/health` |
+| Validation | `.github/workflows/platform-ci.yml` | Renders every compose combination, shellcheck, cloud-init YAML, `caddy validate` |
+| API health endpoint | `imls-dmt-api` devel: `GET /api/health` | Pings Solr core and MySQL; 200 or 503 with JSON detail; rate-limit exempt |
+| API ORCID fix | `imls-dmt-api` devel: `orcid_sign_in()` | Falls back to `request.host` when `X-Forwarded-Host` is absent; the production 500 cannot recur |
+
+### Original build list (for reference)
 
 1. **`docker-compose.prod.yml`** overriding the base stack: adds a `caddy`
    service (ports 80/443, `Caddyfile` with the four hostnames, reverse proxy to
@@ -109,8 +127,28 @@ production.
    for all four names at the reserved IP; Caddy issues certificates on first
    request. Confirm the uptime checks go green. Keep the UNM host untouched for
    two weeks as a fallback.
-7. **Legacy name**: ask ESIP to point `dmtclearinghouse.esipfed.org` at
-   `www.dmtc-prod.org` (CNAME or Cloudflare redirect). This closes UI issue #71.
+7. **Legacy name** (`dmtclearinghouse.esipfed.org`, owned by ESIP, currently
+   Cloudflare-proxied to the UNM server). Proposed model, designed so ESIP is
+   asked exactly once and never again:
+
+   - We add an A record in the Hover zone we control:
+     `legacy.dmtc-prod.org -> <reserved IP>`.
+   - ESIP replaces their record with a single **DNS-only (grey-cloud) CNAME**:
+     `dmtclearinghouse.esipfed.org CNAME legacy.dmtc-prod.org`.
+   - Caddy on our droplet (`caddy/sites/legacy.caddy`) obtains a certificate
+     for the ESIP name, since traffic now reaches us, and answers every request
+     with a `301` to `https://www.dmtc-prod.org` preserving path and query, so
+     old bookmarks, citations and search-engine links keep working. If the
+     destination ever changes, it is a one-line edit on our side.
+
+   If ESIP prefers not to CNAME to an external zone, the fallback is a
+   Cloudflare **Redirect Rule** on their side (`dmtclearinghouse.esipfed.org/*`
+   -> `https://www.dmtc-prod.org/${1}`, 301, preserve query string) with the
+   DNS record left proxied and pointing anywhere; that also needs no
+   certificate work from anyone, but future changes need an ESIP ticket. A
+   CNAME to `www.dmtc-prod.org` directly is **not** recommended: Caddy would
+   then have to serve the site itself under the ESIP name (split identity,
+   duplicate content) rather than redirect. This closes UI issue #71.
 8. **Close out**: UI issues #74, #95, #98, #99, #101 and API #106 to #109 are
    all resolved by this move; update the board.
 
@@ -134,14 +172,26 @@ Both checks run from `us_east` and `us_west`. To add a Slack channel:
 (`doctl monitoring alert create --type v1/insights/droplet/cpu` etc.) for CPU,
 memory and disk at 85%.
 
-## Decisions needed before provisioning
+## Decisions (taken 2026-09-16)
 
-- Region: `nyc3` (closest to ESIP and most East-coast users) or `sfo3`.
-- Backups: DO weekly droplet backups (simple, +20%) versus snapshots on a
-  schedule (cheaper, manual).
-- DNS: stay at Hover or move to DO DNS.
-- Notification channel beyond email: Slack webhook, and whether a second
-  address should receive alerts.
-- Access to the UNM host for the data export, and who holds the ORCID client
-  secret.
-- Development stack on the same droplet or its own.
+| Question | Decision |
+|---|---|
+| Region | `nyc3` |
+| Backups | DO weekly droplet backups (+20%), plus nightly database dumps to Spaces |
+| DNS | Stays at Hover |
+| Notifications | Email only, to kbene@karlbenedict.com. DO only accepts team-member addresses: add it under Settings > Team (or make it the account email) and then run `doctl monitoring uptime alert update ... --emails kbene@karlbenedict.com` for the four alerts |
+| Development site | Same droplet, separate compose project (`make devsite-up`), served by the production Caddy on dmtc-devel.org |
+| UNM host access | Available (SSH) for the data export |
+| ORCID client secret | On the UNM host; to be located. Current auth model under review (see ORCID section when added) |
+
+## Still to do before cutover
+
+1. Add kbene@karlbenedict.com to the DO team and repoint the four alert emails.
+2. Locate the ORCID client secret on the UNM host; register the new redirect
+   URIs (see step 5 above).
+3. Merge `devel -> testing -> master/main` in all three repos so the droplet's
+   `prod-deploy` pulls the release branches.
+4. Provision the droplet (`doctl compute droplet create ...` with
+   `dev-vm/cloud-init-prod.yaml`), reserved IP, cloud firewall, Spaces bucket
+   and access key.
+5. Export data from the UNM host and import (steps 3 and 4 above).

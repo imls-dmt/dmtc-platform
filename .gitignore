@@ -13,3 +13,5 @@ docker-compose.override.yml
 *.json.export
 dmtc-solr-export*/
 **/dmtc-solr-export*.tgz
+.env.prod
+.env.devsite

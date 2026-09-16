@@ -4,6 +4,8 @@ SHELL := /bin/bash
 # ── Compose command helpers ────────────────────────────────────────────────────
 DEV_COMPOSE  := docker compose -p dmtc-dev  -f docker-compose.yml -f docker-compose.dev.yml  --env-file .env.dev
 TEST_COMPOSE := docker compose -p dmtc-test -f docker-compose.yml -f docker-compose.test.yml --env-file .env.test
+PROD_COMPOSE := docker compose -p dmtc-prod -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod
+DEVSITE_COMPOSE := docker compose -p dmtc-devsite -f docker-compose.yml -f docker-compose.devsite.yml --env-file .env.devsite
 
 # ── Dev stack ─────────────────────────────────────────────────────────────────
 .PHONY: dev-up
@@ -71,6 +73,70 @@ seed-solr-test: .env.test  ## Bootstrap-seed test Solr from MySQL blobs (no auth
 backup-solr-test: .env.test  ## Back up test Solr-primary cores into MySQL
 	@./scripts/sync-solr-to-mysql.sh test
 
+# ── Production stack (droplet) ────────────────────────────────────────────────
+.PHONY: prod-up
+prod-up: .env.prod  ## Start/refresh the production stack (Caddy TLS + ui + api + solr + mysql), detached
+	$(PROD_COMPOSE) up -d --remove-orphans
+
+.PHONY: prod-down
+prod-down:  ## Stop production containers (volumes and certificates preserved)
+	$(PROD_COMPOSE) down
+
+.PHONY: prod-build
+prod-build: .env.prod  ## Rebuild production images (ui and api) from the checked-out sources
+	$(PROD_COMPOSE) build --pull
+
+.PHONY: prod-deploy
+prod-deploy: .env.prod  ## Pull master/main in all three repos, rebuild, restart, and wait for /api/health
+	@set -e; for r in imls-dmt-api userinterface dmtc-platform; do \
+	  echo "== $$r"; git -C "$(CURDIR)/../$$r" pull --ff-only; done
+	git -C "$(CURDIR)/../userinterface" submodule update --init --recursive
+	$(PROD_COMPOSE) build --pull
+	$(PROD_COMPOSE) up -d --remove-orphans
+	@./scripts/wait-for-health.sh "https://$$(grep ^PROD_HOST .env.prod | cut -d= -f2)/api/health"
+
+.PHONY: prod-reload
+prod-reload:  ## Reload Caddy after editing caddy/Caddyfile or caddy/sites/*.caddy
+	$(PROD_COMPOSE) exec caddy caddy reload --config /etc/caddy/Caddyfile
+
+.PHONY: prod-logs
+prod-logs:  ## Stream logs from the production stack
+	$(PROD_COMPOSE) logs -f --tail=200
+
+.PHONY: prod-status
+prod-status: .env.prod  ## Container status plus the API health report
+	$(PROD_COMPOSE) ps
+	@curl -fsS "https://$$(grep ^PROD_HOST .env.prod | cut -d= -f2)/api/health" || true; echo
+
+.PHONY: prod-backup
+prod-backup: .env.prod  ## Run the nightly backup now (Solr->MySQL sync, mysqldump, upload to Spaces)
+	@./scripts/backup-to-spaces.sh prod
+
+.PHONY: prod-reindex
+prod-reindex: .env.prod  ## Trigger a full Solr reindex on production (needs admin login)
+	@./scripts/reindex.sh "https://$$(grep ^PROD_HOST .env.prod | cut -d= -f2)" "$(DMTC_ADMIN_USER)" "$(DMTC_ADMIN_PASS)"
+
+# ── Development site (public dmtc-devel.org, same droplet) ────────────────────
+.PHONY: devsite-up
+devsite-up: .env.devsite  ## Start/refresh the public development site (served by the prod Caddy)
+	$(DEVSITE_COMPOSE) up -d --remove-orphans
+
+.PHONY: devsite-down
+devsite-down:  ## Stop the development-site containers (volumes preserved)
+	$(DEVSITE_COMPOSE) down
+
+.PHONY: devsite-build
+devsite-build: .env.devsite  ## Rebuild development-site images from the checked-out sources
+	$(DEVSITE_COMPOSE) build --pull
+
+.PHONY: devsite-logs
+devsite-logs:  ## Stream logs from the development site
+	$(DEVSITE_COMPOSE) logs -f --tail=200
+
+.PHONY: devsite-backup
+devsite-backup: .env.devsite  ## Back up the development-site database to Spaces
+	@./scripts/backup-to-spaces.sh devsite
+
 # ── Database sync ─────────────────────────────────────────────────────────────
 .PHONY: sync-db-dev
 sync-db-dev: .env.dev scripts/.env.prod-sync  ## Sync production DB snapshot into dev stack
@@ -130,6 +196,16 @@ vm-status:  ## Show Lima VM status
 .env.test:
 	@echo "ERROR: .env.test not found. Copy .env.test.example and fill in values:" >&2
 	@echo "  cp .env.test.example .env.test" >&2
+	@exit 1
+
+.env.prod:
+	@echo "ERROR: .env.prod not found. Copy .env.prod.example and fill in values:" >&2
+	@echo "  cp .env.prod.example .env.prod" >&2
+	@exit 1
+
+.env.devsite:
+	@echo "ERROR: .env.devsite not found. Copy .env.devsite.example and fill in values:" >&2
+	@echo "  cp .env.devsite.example .env.devsite" >&2
 	@exit 1
 
 scripts/.env.prod-sync:

@@ -1,0 +1,40 @@
+# Development-site overrides — the public dmtc-devel.org stack, run on the same
+# droplet as production as a separate compose project with its own MySQL and
+# Solr volumes (non-authoritative data; see imls-dmt-api issue #106).
+#
+# Usage:  make devsite-up      (docker compose -p dmtc-devsite \
+#           -f docker-compose.yml -f docker-compose.devsite.yml --env-file .env.devsite up -d)
+#
+# Publishes no ports. The production Caddy (docker-compose.prod.yml) reaches
+# this project's nginx over the shared "dmtc-edge" network under the alias
+# "ui-devsite" and serves it on dmtc-devel.org. Start the prod project first
+# so the network exists.
+
+services:
+
+  ui:
+    ports: !reset []
+    restart: always
+    networks:
+      default:
+      edge:
+        aliases:
+          - ui-devsite
+
+  api:
+    restart: always
+    environment:
+      FLASK_DEBUG: "0"
+
+  mysql:
+    restart: always
+
+  solr:
+    restart: always
+    environment:
+      SOLR_HEAP: ${SOLR_HEAP:-768m}
+
+networks:
+  edge:
+    external: true
+    name: dmtc-edge

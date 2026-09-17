@@ -30,6 +30,9 @@ services:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./caddy/sites:/etc/caddy/sites:ro
       - ./caddy/tls:/etc/caddy/tls:ro
+      # ui-static-content checkouts served by Caddy for /source/* and /images/*
+      - ${CONTENT_DIR:-../ui-static-content}:/srv/content:ro
+      - ${DEVSITE_CONTENT_DIR:-../ui-static-content}:/srv/content-devsite:ro
       - caddy_data:/data
       - caddy_config:/config
     networks:

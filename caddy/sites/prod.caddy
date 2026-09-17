@@ -16,11 +16,23 @@
 		-Server
 	}
 
-	# nginx in the ui container serves the SPA and proxies /api/ to the API.
-	# X-Forwarded-Host is what the API uses to build the ORCID callback.
-	reverse_proxy ui:80 {
-		header_up X-Forwarded-Host {host}
-		header_up X-Forwarded-Proto {scheme}
+	# Site content (markdown, JSON, images) comes straight from a checkout of
+	# the ui-static-content repository mounted at /srv/content, refreshed by cron.
+	# Editors publish by merging to that repository; no UI rebuild is needed.
+	@content path /source/* /images/*
+	handle @content {
+		root * /srv/content
+		header Cache-Control "public, max-age=300"
+		file_server
+	}
+
+	# Everything else: nginx in the ui container serves the SPA and proxies
+	# /api/ to the API. X-Forwarded-Host is what the API uses for the ORCID callback.
+	handle {
+		reverse_proxy ui:80 {
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto {scheme}
+		}
 	}
 
 	log {

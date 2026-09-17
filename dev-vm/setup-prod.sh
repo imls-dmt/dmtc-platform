@@ -70,9 +70,17 @@ clone() { local repo=$1 branch=$2 extra=${3:-}; if [[ -d /opt/dmtc/$repo/.git ]]
 clone imls-dmt-api master
 clone userinterface master --recurse-submodules
 clone dmtc-platform main
+clone ui-static-content main
 
 echo "== shared docker network"
 docker network inspect dmtc-edge > /dev/null 2>&1 || docker network create dmtc-edge > /dev/null
+
+echo "== site content refresh cron (every 5 minutes)"
+cat > /etc/cron.d/dmtc-content <<'CRON'
+# Pull the ui-static-content repository so Caddy serves the latest /source and /images.
+*/5 * * * * dmtc /opt/dmtc/dmtc-platform/scripts/refresh-content.sh >> /var/log/dmtc-content.log 2>&1
+CRON
+touch /var/log/dmtc-content.log && chown dmtc:dmtc /var/log/dmtc-content.log
 
 echo "== nightly backup cron"
 cat > /etc/cron.d/dmtc-backup <<'CRON'

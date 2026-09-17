@@ -48,6 +48,10 @@ write_files:
     content: |
       Unattended-Upgrade::Automatic-Reboot "false";
       Unattended-Upgrade::Remove-Unused-Dependencies "true";
+  - path: /etc/cron.d/dmtc-content
+    content: |
+      # Pull the ui-static-content repository so Caddy serves the latest /source and /images.
+      */5 * * * * dmtc /opt/dmtc/dmtc-platform/scripts/refresh-content.sh >> /var/log/dmtc-content.log 2>&1
   - path: /etc/cron.d/dmtc-backup
     content: |
       # Nightly at 03:15 UTC: Solr -> MySQL sync, mysqldump, upload to Spaces.
@@ -86,6 +90,7 @@ runcmd:
   - sudo -u dmtc git clone --branch master https://github.com/imls-dmt/imls-dmt-api.git /opt/dmtc/imls-dmt-api
   - sudo -u dmtc git clone --branch master --recurse-submodules https://github.com/imls-dmt/userinterface.git /opt/dmtc/userinterface
   - sudo -u dmtc git clone --branch main https://github.com/imls-dmt/dmtc-platform.git /opt/dmtc/dmtc-platform
+  - sudo -u dmtc git clone --branch main https://github.com/imls-dmt/ui-static-content.git /opt/dmtc/ui-static-content
   - sudo -u dmtc touch /var/log/dmtc-backup.log || true
   - touch /var/log/dmtc-backup.log && chown dmtc:dmtc /var/log/dmtc-backup.log
 

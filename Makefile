@@ -120,6 +120,10 @@ prod-restore-db: .env.prod  ## Import a production MySQL dump: make prod-restore
 prod-restore-solr: .env.prod  ## Restore Solr index data from a /var/solr/data tarball: make prod-restore-solr TARBALL=path/to/dmtc-solr-data-YYYYMMDD.tgz
 	@./scripts/restore-solr-index.sh prod "$(TARBALL)"
 
+.PHONY: content-pull
+content-pull:  ## Fast-forward the ui-static-content checkout served by Caddy (cron does this every 5 min)
+	@CONTENT_DIR=$$(cd "$(CURDIR)/../ui-static-content" && pwd) ./scripts/refresh-content.sh
+
 .PHONY: prod-reindex
 prod-reindex: .env.prod  ## Trigger a full Solr reindex on production (needs admin login)
 	@./scripts/reindex.sh "https://$$(grep ^PROD_HOST .env.prod | cut -d= -f2)" "$(DMTC_ADMIN_USER)" "$(DMTC_ADMIN_PASS)"

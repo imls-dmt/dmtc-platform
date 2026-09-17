@@ -1,7 +1,10 @@
 # Migrating DMTC hosting to DigitalOcean
 
-Status: **approved 2026-09-16, repository work complete, droplet not yet
-provisioned.** Decisions taken: region `nyc3`; DO weekly droplet backups;
+Status: **staged and verified 2026-09-17.** Droplet `dmtc-prod` (id 601272917,
+nyc3, s-4vcpu-8gb, reserved IP 134.199.249.40) runs the full stack with the
+production data restored; every endpoint answers correctly through Caddy with
+staging (self-signed) certificates. DNS has not moved. Remaining before
+cutover is listed at the end. Decisions taken: region `nyc3`; DO weekly droplet backups;
 DNS stays at Hover; email-only alerts (to kbene@karlbenedict.com once that
 address is added to the DO team); development site on the same droplet as a
 second compose project. Uptime checks exist against the current host.
@@ -242,14 +245,78 @@ OIDC reference <https://github.com/ORCID/ORCID-Source/blob/main/orcid-web/ORCID_
 discovery <https://orcid.org/.well-known/openid-configuration>;
 sandbox <https://info.orcid.org/documentation/integration-guide/sandbox-testing-server/>.
 
+## Provisioned resources (2026-09-16)
+
+| Resource | Value |
+|---|---|
+| Droplet | `dmtc-prod`, id **601272917**, nyc3, `s-4vcpu-8gb`, Ubuntu 24.04, tags `dmtc,prod`, backups + monitoring on. Provisioned with `dev-vm/setup-prod.sh` over SSH after the first attempt's cloud-init was rejected (non-ASCII bytes in user-data; fixed, CI-guarded). |
+| Orphaned droplet | id 601271964 (167.71.187.71), empty, must be deleted in the DO console: the doctl token cannot delete droplets |
+| Public IPv4 (ephemeral) | 165.227.126.172 |
+| Reserved IP (use this in DNS) | **134.199.249.40** |
+| Cloud firewall | `dmtc-prod-fw` (tag `dmtc`): in 22/tcp, 80/tcp, 443/tcp, 443/udp; all out |
+| Deploy user | `dmtc` (SSH keys from the DO account), repos under `/opt/dmtc` |
+| Spaces | bucket `dmtc-backups` (nyc3), created by the first backup run; bootstrap key `dmtc-backups-bootstrap` (full access) to be replaced by a bucket-scoped key once the bucket exists, then deleted |
+| Uptime checks | API `0a0a9b26-…`, UI `37e5df47-…` (currently pointed at the UNM host) |
+
+`.env.prod` was generated locally in this directory (gitignored) with fresh
+`FLASK_SECRET_KEY` and MySQL passwords, `MYSQL_DATABASE=imls` to match the
+production dump, `ACME_EMAIL`, and the Spaces credentials. ORCID values are
+still blank. Copy it to `/opt/dmtc/dmtc-platform/.env.prod` on the droplet.
+
+## Data export (2026-09-16, from the UNM host)
+
+- `backup/dmtc-solr-data-20260916.tgz` (3.1 MB): full `/var/solr/data`, ten
+  cores, verified. Restore with `make prod-restore-solr TARBALL=...`.
+- `backup/dmtc-mysql-20260916.sql.gz`: `--all-databases` dump, arrived
+  truncated. Re-export as a single database:
+  `sudo mysqldump --single-transaction --quick imls | gzip > ~/dmtc-imls-YYYYMMDD.sql.gz`
+  and restore with `make prod-restore-db DUMP=...`. The API uses only `imls`
+  (tables feedback, learningresources, taxonomies, tokens, users); `dmt` and
+  `imls_nightly` are legacy Drupal-era databases and are not migrated.
+
+## Staging verification (2026-09-17)
+
+Data restored with `scripts/restore-db-dump.sh` and `scripts/restore-solr-index.sh`:
+MySQL `imls` 942 learningresources / 866 users / 26 taxonomies / 32 feedback /
+11 tokens; Solr cores learningresources 942, surveys 921, users 804, timestamps
+659, answers 102, questions 75, taxonomies 24, question_groups 2, feedback 0
+(all matching the UNM host). Tested from outside with host overrides
+(`curl --resolve www.dmtc-prod.org:443:134.199.249.40 -k`):
+
+| Check | Result |
+|---|---|
+| UI index, SPA deep link `/resource/<id>`, `/source/home.json` (submodule content) | 200 |
+| `/api/health` | 200 `{"mysql":"ok","solr":"ok"}` |
+| Resource by id, default search (hits-total 670, same as the UNM host), RSS, vocabularies | 200 |
+| `http://www.dmtc-prod.org/search?x=1` | 308 to `https://www.dmtc-prod.org/search?x=1` (path preserved: fixes UI #101) |
+| `https://dmtc-prod.org/resource/abc` | 301 to `https://www.dmtc-prod.org/resource/abc` |
+| `/api/orcid_sign_in` | 302 to ORCID with callback `https://www.dmtc-prod.org/api/orcid_sign_in/orcid_callback/www.dmtc-prod.org` (client id still empty) |
+| Headers | HSTS, nosniff, HTTP/3 advertised |
+
+Notes from staging: the droplet's `dmtc-platform` checkout is on `devel`
+(restore scripts, TLS mode) and must return to `main` once those changes are
+promoted; `.env.prod` has `TLS_MODE=internal` and must switch to `acme` at
+cutover; the ui image must be built with `target: production` (now pinned).
+
 ## Still to do before cutover
 
-1. Add kbene@karlbenedict.com to the DO team and repoint the four alert emails.
-2. Locate the ORCID client secret on the UNM host; register the new redirect
-   URIs (see step 5 above).
-3. Merge `devel -> testing -> master/main` in all three repos so the droplet's
-   `prod-deploy` pulls the release branches.
-4. Provision the droplet (`doctl compute droplet create ...` with
-   `dev-vm/cloud-init-prod.yaml`), reserved IP, cloud firewall, Spaces bucket
-   and access key.
-5. Export data from the UNM host and import (steps 3 and 4 above).
+1. Delete orphaned droplet 601271964 in the DO console.
+2. Add kbene@karlbenedict.com to the DO team and repoint the four alert emails.
+3. ORCID: register a Public API client under the maintainer's own ORCID record
+   (see ORCID section), redirect URIs
+   `https://www.dmtc-prod.org/api/orcid_sign_in/orcid_callback/www.dmtc-prod.org`
+   and the `www.dmtc-devel.org` equivalent; put client id and secret in
+   `.env.prod` on the droplet; test sign-in on the staged host with a hosts-file
+   override.
+4. Promote `dmtc-platform` devel -> testing -> main (restore scripts, TLS mode,
+   ui build target, setup-prod.sh); then `git checkout main` on the droplet.
+5. Cutover: set `TLS_MODE=acme` in `.env.prod`, `make prod-up`; lower TTLs at
+   Hover, then point A records for `dmtc-prod.org`, `www.dmtc-prod.org`,
+   `dmtc-devel.org`, `www.dmtc-devel.org` at **134.199.249.40**; watch
+   `make prod-logs` for certificate issuance; confirm the uptime checks and
+   retarget the API check to `/api/health`.
+6. Start the dev site (`.env.devsite`, `make devsite-up`) and seed it with a
+   copy of the data.
+7. Run `make prod-backup` once by hand to create the Spaces bucket, then create
+   a bucket-scoped key and delete the bootstrap key.
+8. Ask ESIP for the legacy CNAME; enable `caddy/sites/legacy.caddy`.

@@ -1,5 +1,5 @@
 #cloud-config
-# DMTC production droplet — cloud-init user-data.
+# DMTC production droplet - cloud-init user-data.
 #
 # Provision with:
 #   doctl compute droplet create dmtc-prod --region nyc3 --size s-4vcpu-8gb \
@@ -10,7 +10,7 @@
 # Engine + compose plugin, rclone (Spaces backups), the DigitalOcean metrics
 # agent and unattended security upgrades; adds a 2 GB swap file; clones the
 # three DMTC repositories into /opt/dmtc; creates the shared "dmtc-edge" Docker
-# network; installs the nightly backup cron. It does NOT start the stack —
+# network; installs the nightly backup cron. It does NOT start the stack -
 # .env.prod must be written by hand first (see docs/digitalocean-migration.md).
 
 package_update: true
@@ -22,6 +22,7 @@ users:
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDa7g7ZyLoGdeJZJtF03o0ha76NNERd6DP/Bro+jzOZbEL9NZufsyYFcD94DWncXQcMMX8jNeoD/XI8GmqPLzpP7VjzMWOCphV/Ej8jx7JTr7/biJekqnWBbss/f1MyXX9Nq9S9ULA2NWQRmDt1Wu4YZx2/HcP4NR0tzUcFquRI06kvQmwUhoYpRE3i1XGx4DbKlsls5NFF1Dm3YJCK5UWqVa3XsiyK5vu4Mnk+aKkQYOsHiqr8FLlusPAOoZiT5z4HWCueBpcreGYPwGY85MVgYRgGq0DK+KZ3syEIJQv3On2eZ1vD9cUnE3sjmSNiC4iZLoz5ynPkCbF7T893aLOGHEBeCOH4MPcLuwdnbBnhy5EacNp17SjBProCiaGYXocG6TyMyv7ICBZhEPgLuQDpG6GTFPIGQd19z3c0HTSG1nj/Az8OFr+WyXGfLj79u4F8ZJcr0MmGjW3b+HzgnRSBzkyvM3OOTFeRD6jhjE79UjuijAZuVCs9+HNxWeqAO26sNV2/i8bbbICD7dDhrjkhzkyc2q2oiOlfRxeLus70rrWosLFBZNzA5w05YkVgf5Kssh9YgENYWrE4yZq3K59kfc5o+DTXrexqVKqLrd1rARRJtjOG5QV/r0W+nN9/jl8L9HrnPLLKsZ7Qb14LYRsVIqZh7EJVZ9AUtPHSVLS8nQ== kbene@karls-mbp.unm.edu
       - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBDrqzxxBy3Xq6EwLZhsOZ+WfVMDc9oBFZCaIKuaErL9 kbene@unm.edu
       - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDcUPsbgbf/S/2pQ/H6Pj6fViRBlVPRj/fbCVAwDZ8cL3NVwbWJ6q4nf55PkNJPr0z9hegcQOF+DM3FhqYroAUJqUuRfjYSA0bHSoZMs1g0ZbCIxYJlwjdNC12IMggQQKMp7WVzYNLQHJjOmPZpLXgCRL3Kx4OCl8Ho5nWZdIDe5de+yeg7KXXhOa5MSRnzhgZSh6ltC1jvRZHVYF1uMTuAPEqAxFXNtuq+bm0djoz+PXBQPJosAJY/Ml8wig4u6JVTZUJ+YjejADBWmpiYoSwyvy+R6g43D53C9XWmuBNQkX9twrdY+oFcxQuztitKcG6pwmXR0BAZokzKh8cyiAInaG8JMmUdTEwQhXKbgJfnupw1fVgQ9wWTDchZOaJKSrUaJ4NLVun3c6ASQYjBprXPSF1aWPIh/0c4BkAtPow4O1wafobSyYLDdoGSra2JxOyc9Hvu/0s4hKpiH4Ovl0qHs30gChBrJwkcuHr2yoA4iIed7A416Tg/Ez0lfB6h8k0= kbene@Karls-iMac.local
 

@@ -32,6 +32,13 @@ jobs:
           sudo apt-get install -y -qq shellcheck > /dev/null
           shellcheck -S warning scripts/*.sh dev-vm/setup.sh
 
+      - name: Cloud-init files must be pure ASCII
+        # Non-ASCII bytes in user-data were mangled in transit and made
+        # cloud-init reject the whole config on the first production droplet.
+        run: |
+          if LC_ALL=C grep -nP '[^\x00-\x7F]' dev-vm/cloud-init*.yaml; then
+            echo "::error::non-ASCII characters in cloud-init user-data"; exit 1; fi
+
       - name: Validate cloud-init and Lima YAML
         run: |
           pip install -q pyyaml

@@ -1,5 +1,5 @@
 #cloud-config
-# DMTC development environment — cloud-init user-data
+# DMTC development environment - cloud-init user-data
 #
 # Use this when launching a cloud VM (AWS, GCP, DigitalOcean, Linode, etc.)
 # or when provisioning a machine with Ubuntu 22.04 or 24.04 that supports
@@ -15,7 +15,7 @@
 #     bash setup.sh user
 #
 # Resources recommended for comfortable development:
-#   4 vCPU, 8 GB RAM, 60 GB disk — Ubuntu 22.04 or 24.04, AMD64 or ARM64
+#   4 vCPU, 8 GB RAM, 60 GB disk - Ubuntu 22.04 or 24.04, AMD64 or ARM64
 
 package_update: true
 package_upgrade: true
@@ -55,7 +55,7 @@ runcmd:
   # Adjust if your image uses a different username.
   - usermod -aG docker ubuntu
 
-  # Claude Code — configure user-local npm prefix first to avoid permission errors,
+  # Claude Code - configure user-local npm prefix first to avoid permission errors,
   # then install. The PATH update is written to .bashrc for all future sessions.
   - >
     su - ubuntu -c "
@@ -83,9 +83,9 @@ final_message: |
     newgrp docker
     make dev-up
 
-  Authenticate Claude Code (Pro/Max subscription — no API key needed):
+  Authenticate Claude Code (Pro/Max subscription - no API key needed):
     claude login
     # Choose 'subscription', not 'Console / API key'.
-    # Do NOT set ANTHROPIC_API_KEY in your environment — if present it
+    # Do NOT set ANTHROPIC_API_KEY in your environment - if present it
     # overrides subscription auth and bills the API separately from your plan.
     # Verify active auth method inside Claude Code with: /status

@@ -44,6 +44,10 @@ services:
       retries: 3
 
   ui:
+    build:
+      # The Dockerfile's last stage is the hot-reload dev server; without an
+      # explicit target Docker would build that instead of the nginx image.
+      target: production
     # Only Caddy is reachable from outside; drop the base file's port mapping.
     ports: !reset []
     restart: always

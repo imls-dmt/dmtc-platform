@@ -310,13 +310,30 @@ cutover; the ui image must be built with `target: production` (now pinned).
    override.
 4. Promote `dmtc-platform` devel -> testing -> main (restore scripts, TLS mode,
    ui build target, setup-prod.sh); then `git checkout main` on the droplet.
-5. Cutover: set `TLS_MODE=acme` in `.env.prod`, `make prod-up`; lower TTLs at
+5. **Reset both stacks to the source data before cutover.** The staged
+   production stack and the dev site have been used for testing (workflow
+   changes, edits), so before DNS moves restore both from the 2026-09-16
+   export taken from the UNM host, or from a fresh export taken the same day
+   if production has been edited since (compare `modification_date` maxima
+   first). Files: `backup/dmtc-imls-20260916.sql.gz` and
+   `backup/dmtc-solr-data-20260916.tgz` (also on the droplet under
+   `~/dmtc-import/`). Commands, on the droplet:
+   ```
+   make prod-restore-db     DUMP=~/dmtc-import/dmtc-imls-YYYYMMDD.sql.gz
+   make prod-restore-solr   TARBALL=~/dmtc-import/dmtc-solr-data-YYYYMMDD.tgz
+   ./scripts/restore-db-dump.sh    devsite ~/dmtc-import/dmtc-imls-YYYYMMDD.sql.gz
+   ./scripts/restore-solr-index.sh devsite ~/dmtc-import/dmtc-solr-data-YYYYMMDD.tgz
+   ```
+   `restore-db-dump.sh` replaces rows in the same tables; if test activity
+   created new records, drop and recreate the `imls` database first so no
+   test rows survive (`mysql -e 'DROP DATABASE imls; CREATE DATABASE imls'`
+   inside the mysql container, then `init-mysql.sql`, then the restore).
+6. Cutover: set `TLS_MODE=acme` in `.env.prod`, `make prod-up`; lower TTLs at
    Hover, then point A records for `dmtc-prod.org`, `www.dmtc-prod.org`,
    `dmtc-devel.org`, `www.dmtc-devel.org` at **134.199.249.40**; watch
    `make prod-logs` for certificate issuance; confirm the uptime checks and
    retarget the API check to `/api/health`.
-6. Start the dev site (`.env.devsite`, `make devsite-up`) and seed it with a
-   copy of the data.
-7. Run `make prod-backup` once by hand to create the Spaces bucket, then create
+7. Dev site is already running (`make devsite-up`); it is reset in step 5.
+8. Run `make prod-backup` once by hand to create the Spaces bucket, then create
    a bucket-scoped key and delete the bootstrap key.
-8. Ask ESIP for the legacy CNAME; enable `caddy/sites/legacy.caddy`.
+9. Ask ESIP for the legacy CNAME; enable `caddy/sites/legacy.caddy`.

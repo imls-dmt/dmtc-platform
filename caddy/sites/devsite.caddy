@@ -1,0 +1,22 @@
+# Development site: www.dmtc-devel.org, served from the dmtc-devsite compose
+# project over the shared dmtc-edge network. Remove or rename this file
+# (e.g. devsite.caddy.off) to disable the development site.
+
+{$DEVSITE_APEX} {
+	redir https://{$DEVSITE_HOST}{uri} permanent
+}
+
+{$DEVSITE_HOST} {
+	encode zstd gzip
+
+	header {
+		X-Robots-Tag "noindex, nofollow"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+
+	reverse_proxy ui-devsite:80 {
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}

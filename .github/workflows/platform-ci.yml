@@ -1,0 +1,51 @@
+# Validates the platform definitions on every change: every compose stack
+# combination renders, shell scripts pass shellcheck, cloud-init files are
+# valid YAML, and the Caddyfile parses.
+name: Platform CI
+
+on:
+  push:
+    branches: [devel, testing, main]
+  pull_request:
+    branches: [devel, testing, main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Render every compose stack
+        run: |
+          set -e
+          for stack in dev test prod devsite; do
+            envfile=".env.$stack.example"
+            [ -f "$envfile" ] || envfile=".env.dev.example"
+            echo "== $stack ($envfile)"
+            docker compose -p "dmtc-$stack" -f docker-compose.yml -f "docker-compose.$stack.yml" \
+              --env-file "$envfile" config --quiet
+          done
+
+      - name: Shellcheck scripts
+        run: |
+          sudo apt-get install -y -qq shellcheck > /dev/null
+          shellcheck -S warning scripts/*.sh dev-vm/setup.sh
+
+      - name: Validate cloud-init and Lima YAML
+        run: |
+          pip install -q pyyaml
+          python3 - <<'PY'
+          import yaml, glob
+          for f in glob.glob("dev-vm/*.yaml"):
+              yaml.safe_load(open(f)); print("ok", f)
+          PY
+
+      - name: Validate Caddyfile
+        run: |
+          mkdir -p /tmp/caddy && cp -r caddy/* /tmp/caddy/
+          docker run --rm -v /tmp/caddy:/etc/caddy:ro \
+            -e ACME_EMAIL=ci@example.org -e PROD_HOST=www.example.org -e PROD_APEX=example.org \
+            -e DEVSITE_HOST=www.dev.example.org -e DEVSITE_APEX=dev.example.org \
+            -e LEGACY_HOST=legacy.example.org \
+            caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

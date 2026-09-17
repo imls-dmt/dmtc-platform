@@ -1,0 +1,21 @@
+# Legacy hostname redirect — dmtclearinghouse.esipfed.org, owned by ESIP.
+#
+# Model proposed to ESIP: they create ONE DNS-only (grey-cloud) CNAME
+#   dmtclearinghouse.esipfed.org  CNAME  legacy.dmtc-prod.org
+# and never touch it again. legacy.dmtc-prod.org is an A record in the
+# Hover zone we control, pointing at this droplet. Caddy obtains a certificate
+# for the ESIP name (traffic reaches us, so the HTTP-01 challenge succeeds) and
+# issues a permanent redirect that preserves path and query, so every old
+# bookmark, citation and search-engine link lands on the current site. Where
+# it redirects to is then a one-line change on our side, with no ESIP ticket.
+#
+# Enable by renaming to legacy.caddy AFTER ESIP's CNAME is live, then
+# `make prod-reload`. Set LEGACY_HOST in .env.prod (default below).
+
+{$LEGACY_HOST:dmtclearinghouse.esipfed.org} {
+	redir https://{$PROD_HOST}{uri} permanent
+}
+
+legacy.{$PROD_APEX} {
+	redir https://{$PROD_HOST}{uri} permanent
+}

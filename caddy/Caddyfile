@@ -1,0 +1,24 @@
+# Caddy front door for the DMTC droplet.
+#
+# Hostnames and the ACME contact come from the environment (see .env.prod).
+# Each site lives in caddy/sites/*.caddy so the development site can be
+# enabled or removed without touching production. Certificates are obtained
+# automatically from Let's Encrypt on first request for each hostname, so
+# DNS for a name must point here before its site block is loaded.
+#
+# Caddy adds the HTTP -> HTTPS redirect for every hostname below itself, with
+# the path preserved (the bug in the old Apache config that broke bookmarks).
+# Do not define a site on :80 here, or those automatic redirects are disabled.
+
+{
+	email {$ACME_EMAIL}
+	# Uncomment while rehearsing a cutover to avoid Let's Encrypt rate limits:
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# Internal liveness endpoint for the container healthcheck; not published.
+:8080 {
+	respond /healthz "ok" 200
+}
+
+import sites/*.caddy

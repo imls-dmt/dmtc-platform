@@ -112,6 +112,14 @@ prod-status: .env.prod  ## Container status plus the API health report
 prod-backup: .env.prod  ## Run the nightly backup now (Solr->MySQL sync, mysqldump, upload to Spaces)
 	@./scripts/backup-to-spaces.sh prod
 
+.PHONY: prod-restore-db
+prod-restore-db: .env.prod  ## Import a production MySQL dump: make prod-restore-db DUMP=path/to/dmtc-imls-YYYYMMDD.sql.gz
+	@./scripts/restore-db-dump.sh prod "$(DUMP)"
+
+.PHONY: prod-restore-solr
+prod-restore-solr: .env.prod  ## Restore Solr index data from a /var/solr/data tarball: make prod-restore-solr TARBALL=path/to/dmtc-solr-data-YYYYMMDD.tgz
+	@./scripts/restore-solr-index.sh prod "$(TARBALL)"
+
 .PHONY: prod-reindex
 prod-reindex: .env.prod  ## Trigger a full Solr reindex on production (needs admin login)
 	@./scripts/reindex.sh "https://$$(grep ^PROD_HOST .env.prod | cut -d= -f2)" "$(DMTC_ADMIN_USER)" "$(DMTC_ADMIN_PASS)"

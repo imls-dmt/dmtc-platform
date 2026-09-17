@@ -1,7 +1,9 @@
 # Migrating DMTC hosting to DigitalOcean
 
-Status: **approved 2026-09-16, repository work complete, droplet not yet
-provisioned.** Decisions taken: region `nyc3`; DO weekly droplet backups;
+Status: **droplet provisioned 2026-09-16 (`dmtc-prod`, id 601271964, nyc3,
+s-4vcpu-8gb, reserved IP 134.199.249.40, firewall dmtc-prod-fw, weekly
+backups on). Data export taken from the UNM host the same day. DNS not yet
+moved.** Decisions taken: region `nyc3`; DO weekly droplet backups;
 DNS stays at Hover; email-only alerts (to kbene@karlbenedict.com once that
 address is added to the DO team); development site on the same droplet as a
 second compose project. Uptime checks exist against the current host.
@@ -241,6 +243,34 @@ version policy <https://info.orcid.org/ufaqs/sunsetting-api-version-2/>;
 OIDC reference <https://github.com/ORCID/ORCID-Source/blob/main/orcid-web/ORCID_AUTH_WITH_OPENID_CONNECT.md>;
 discovery <https://orcid.org/.well-known/openid-configuration>;
 sandbox <https://info.orcid.org/documentation/integration-guide/sandbox-testing-server/>.
+
+## Provisioned resources (2026-09-16)
+
+| Resource | Value |
+|---|---|
+| Droplet | `dmtc-prod`, id 601271964, nyc3, `s-4vcpu-8gb`, Ubuntu 24.04, tags `dmtc,prod`, backups + monitoring on |
+| Public IPv4 (ephemeral) | 167.71.187.71 |
+| Reserved IP (use this in DNS) | **134.199.249.40** |
+| Cloud firewall | `dmtc-prod-fw` (tag `dmtc`): in 22/tcp, 80/tcp, 443/tcp, 443/udp; all out |
+| Deploy user | `dmtc` (SSH keys from the DO account), repos under `/opt/dmtc` |
+| Spaces | bucket `dmtc-backups` (nyc3), created by the first backup run; bootstrap key `dmtc-backups-bootstrap` (full access) to be replaced by a bucket-scoped key once the bucket exists, then deleted |
+| Uptime checks | API `0a0a9b26-…`, UI `37e5df47-…` (currently pointed at the UNM host) |
+
+`.env.prod` was generated locally in this directory (gitignored) with fresh
+`FLASK_SECRET_KEY` and MySQL passwords, `MYSQL_DATABASE=imls` to match the
+production dump, `ACME_EMAIL`, and the Spaces credentials. ORCID values are
+still blank. Copy it to `/opt/dmtc/dmtc-platform/.env.prod` on the droplet.
+
+## Data export (2026-09-16, from the UNM host)
+
+- `backup/dmtc-solr-data-20260916.tgz` (3.1 MB): full `/var/solr/data`, ten
+  cores, verified. Restore with `make prod-restore-solr TARBALL=...`.
+- `backup/dmtc-mysql-20260916.sql.gz`: `--all-databases` dump, arrived
+  truncated. Re-export as a single database:
+  `sudo mysqldump --single-transaction --quick imls | gzip > ~/dmtc-imls-YYYYMMDD.sql.gz`
+  and restore with `make prod-restore-db DUMP=...`. The API uses only `imls`
+  (tables feedback, learningresources, taxonomies, tokens, users); `dmt` and
+  `imls_nightly` are legacy Drupal-era databases and are not migrated.
 
 ## Still to do before cutover
 

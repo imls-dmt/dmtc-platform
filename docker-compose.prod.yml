@@ -24,9 +24,15 @@ services:
       DEVSITE_HOST: ${DEVSITE_HOST:-www.dmtc-devel.org}
       DEVSITE_APEX: ${DEVSITE_APEX:-dmtc-devel.org}
       LEGACY_HOST: ${LEGACY_HOST:-dmtclearinghouse.esipfed.org}
+      TLS_MODE: ${TLS_MODE:-acme}
+      ACME_CA: ${ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./caddy/sites:/etc/caddy/sites:ro
+      - ./caddy/tls:/etc/caddy/tls:ro
+      # ui-static-content checkouts served by Caddy for /source/* and /images/*
+      - ${CONTENT_DIR:-../ui-static-content}:/srv/content:ro
+      - ${DEVSITE_CONTENT_DIR:-../ui-static-content}:/srv/content-devsite:ro
       - caddy_data:/data
       - caddy_config:/config
     networks:
@@ -41,6 +47,10 @@ services:
       retries: 3
 
   ui:
+    build:
+      # The Dockerfile's last stage is the hot-reload dev server; without an
+      # explicit target Docker would build that instead of the nginx image.
+      target: production
     # Only Caddy is reachable from outside; drop the base file's port mapping.
     ports: !reset []
     restart: always

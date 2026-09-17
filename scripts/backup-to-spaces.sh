@@ -67,7 +67,8 @@ export RCLONE_CONFIG_SPACES_ENDPOINT="${SPACES_REGION}.digitaloceanspaces.com"
 export RCLONE_CONFIG_SPACES_ACL=private
 
 echo "[$STAMP] $TARGET: uploading to spaces:$SPACES_BUCKET/$TARGET/"
-rclone copy "$DUMP" "spaces:$SPACES_BUCKET/$TARGET/" --s3-no-check-bucket
+rclone mkdir "spaces:$SPACES_BUCKET" 2>/dev/null || true   # creates the bucket on first run; harmless afterwards
+rclone copy "$DUMP" "spaces:$SPACES_BUCKET/$TARGET/"
 echo "[$STAMP] $TARGET: pruning copies older than $RETENTION days"
 rclone delete "spaces:$SPACES_BUCKET/$TARGET/" --min-age "${RETENTION}d" --include "dmtc-$TARGET-*.sql.gz"
 echo "[$STAMP] $TARGET: done. Latest copies:"

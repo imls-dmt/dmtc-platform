@@ -12,9 +12,13 @@
 
 {
 	email {$ACME_EMAIL}
-	# Uncomment while rehearsing a cutover to avoid Let's Encrypt rate limits:
-	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+	# Production CA by default. Set ACME_CA in .env.prod to
+	# https://acme-staging-v02.api.letsencrypt.org/directory while rehearsing.
+	acme_ca {$ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
 }
+
+# TLS_MODE selects caddy/tls/<mode>.caddy: "acme" (default) or "internal"
+# (self-signed, for staging before DNS moves). Imported by each site block.
 
 # Internal liveness endpoint for the container healthcheck; not published.
 :8080 {

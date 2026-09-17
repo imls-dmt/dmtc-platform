@@ -1,0 +1,2 @@
+# Default TLS mode: automatic certificates from the ACME CA (Let's Encrypt).
+# Nothing to add; Caddy issues certificates for each site hostname on first request.

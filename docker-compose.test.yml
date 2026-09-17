@@ -12,5 +12,9 @@ services:
       FLASK_DEBUG: "0"
 
   ui:
+    build:
+      # The Dockerfile's last stage is the hot-reload dev server; without an
+      # explicit target Docker would build that instead of the nginx image.
+      target: production
     ports:
       - "${TEST_UI_PORT:-8081}:80"

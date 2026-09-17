@@ -1,0 +1,5 @@
+# Staging TLS mode: locally-signed certificates from Caddy's internal CA.
+# Use while DNS still points at the old host (hosts-file testing), so no ACME
+# validations are attempted against names that do not resolve here yet.
+# Clients must skip verification (curl -k) or trust the CA in caddy_data.
+tls internal

@@ -3,10 +3,12 @@
 # (e.g. devsite.caddy.off) to disable the development site.
 
 {$DEVSITE_APEX} {
+	import /etc/caddy/tls/{$TLS_MODE:acme}.caddy
 	redir https://{$DEVSITE_HOST}{uri} permanent
 }
 
 {$DEVSITE_HOST} {
+	import /etc/caddy/tls/{$TLS_MODE:acme}.caddy
 	encode zstd gzip
 
 	header {

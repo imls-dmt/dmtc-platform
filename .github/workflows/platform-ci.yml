@@ -30,7 +30,7 @@ jobs:
       - name: Shellcheck scripts
         run: |
           sudo apt-get install -y -qq shellcheck > /dev/null
-          shellcheck -S warning scripts/*.sh dev-vm/setup.sh
+          shellcheck -S warning scripts/*.sh dev-vm/setup.sh dev-vm/setup-prod.sh
 
       - name: Cloud-init files must be pure ASCII
         # Non-ASCII bytes in user-data were mangled in transit and made
@@ -54,5 +54,5 @@ jobs:
           docker run --rm -v /tmp/caddy:/etc/caddy:ro \
             -e ACME_EMAIL=ci@example.org -e PROD_HOST=www.example.org -e PROD_APEX=example.org \
             -e DEVSITE_HOST=www.dev.example.org -e DEVSITE_APEX=dev.example.org \
-            -e LEGACY_HOST=legacy.example.org \
+            -e LEGACY_HOST=legacy.example.org -e TLS_MODE=acme \
             caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

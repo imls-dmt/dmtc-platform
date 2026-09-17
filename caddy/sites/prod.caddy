@@ -1,10 +1,12 @@
 # Production: www.dmtc-prod.org, with the apex redirecting to www.
 
 {$PROD_APEX} {
+	import /etc/caddy/tls/{$TLS_MODE:acme}.caddy
 	redir https://{$PROD_HOST}{uri} permanent
 }
 
 {$PROD_HOST} {
+	import /etc/caddy/tls/{$TLS_MODE:acme}.caddy
 	encode zstd gzip
 
 	header {

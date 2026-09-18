@@ -336,8 +336,9 @@ once promoted): dmtc-platform `docker-compose.prod.yml`,
 
 ## Still to do before cutover
 
-1. Delete orphaned droplet 601271964 in the DO console.
-2. Add kbene@karlbenedict.com to the DO team and repoint the four alert emails.
+1. ~~Delete orphaned droplet 601271964~~ Done 2026-09-18.
+2. ~~Add kbene@karlbenedict.com to the DO team and repoint the four alert
+   emails~~ Done 2026-09-18; all four uptime alerts verified to notify that address.
 3. ~~ORCID~~ Done 2026-09-18: one production client, three redirect URIs
    (prod, devel, legacy ESIP), credentials in both env files, sign-in and
    logout verified on both sites. Note for testing with a hosts-file override:

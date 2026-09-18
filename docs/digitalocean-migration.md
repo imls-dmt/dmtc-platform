@@ -25,8 +25,10 @@ The production and development sites, the API and the legacy
 | ORCID sign-in | 500 on production: the API needs an `X-Forwarded-Host` header the proxy does not send |
 | Monitoring | None. The outage above was found by accident. |
 
-The June 2026 API security fixes (commit 8c4a6bd on `imls-dmt-api` devel) are
-not deployed. The Docker stack in this repository already runs the whole
+The June 2026 API security fixes (commit 8c4a6bd on `imls-dmt-api`) were
+never deployed to the UNM host. They are in `master` (PR #113) and therefore
+in the image the droplet builds; verified running on both droplet stacks
+2026-09-18. The Docker stack in this repository already runs the whole
 platform and is the deployment unit for the new host, so the migration is
 mostly provisioning, data transfer and DNS rather than new software.
 
@@ -157,6 +159,32 @@ production.
 
 Optionally move DNS for `dmtc-prod.org` and `dmtc-devel.org` from Hover to DO
 DNS so records are managed with `doctl` alongside everything else.
+
+## Resource limits (added 2026-09-18)
+
+The droplet also hosts the development site and a third, personal
+application (an R Shiny app behind a Cloudflare Tunnel, loopback port 7788).
+Measured with both DMTC stacks idle on 2026-09-17: 3.7 GB of 7.9 GB used,
+containers 2.9 GB, peak 3.9 GB during on-droplet image builds; CPU idle. The
+Shiny app wants about 2 GB at a PDF render and forks cores-1 Monte Carlo
+workers by default. No resize is needed, but every container now carries a
+memory limit with swap disabled so a runaway process is killed and restarted
+in its own container rather than the kernel choosing a victim:
+
+| Service | prod | devsite | Basis |
+|---|---|---|---|
+| solr | 1536m | 1280m, 2 CPUs | heap 1g / 768m pre-touched, plus JVM off-heap; ~1.0 / 0.8 GB RSS observed |
+| mysql | 768m | 768m, 1 CPU | 128 MB buffer pool; ~390 MB RSS observed |
+| api | 768m | 768m, 1 CPU | 2 gunicorn workers at ~110 MB, PDF rendering headroom |
+| ui (nginx) | 128m | 128m | static files |
+| caddy | 256m | — | TLS, compression |
+| Shiny app | 3g, 2 CPUs, `RS_MC_WORKERS=2` | — | its own compose file |
+
+Production has no CPU cap so it wins contention; the dev site and the Shiny
+app are capped. Sum of limits is about 10 GB against 7.9 GB physical, which
+is fine: limits are ceilings, not reservations, and the steady state is near
+5 GB. Resize to 16 GB only if the memory alert (85%) fires under real load.
+Reclaim the Docker build cache after rebuilds (`docker builder prune`).
 
 ## Monitoring and notification
 

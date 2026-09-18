@@ -10,9 +10,18 @@
 
 services:
 
+  # Resource governors. The droplet (s-4vcpu-8gb) also hosts the development
+  # site and a third, personal application; every container gets a memory
+  # limit (memswap equal, so no swap) so that a runaway process is killed and
+  # restarted in its own container instead of the kernel picking a victim such
+  # as Solr. Production gets no CPU cap: it should win contention. Sizes are
+  # observed RSS plus headroom (docs/digitalocean-migration.md, "Resource limits").
+
   caddy:
     image: caddy:2-alpine
     restart: always
+    mem_limit: 256m
+    memswap_limit: 256m
     ports:
       - "80:80"
       - "443:443"
@@ -54,6 +63,8 @@ services:
     # Only Caddy is reachable from outside; drop the base file's port mapping.
     ports: !reset []
     restart: always
+    mem_limit: 128m
+    memswap_limit: 128m
     # Caddy must not proxy to the bare service name "ui": Compose registers a
     # service's own name as an alias on every network it joins, so the
     # development site's ui answers to "ui" on dmtc-edge as well, and Caddy
@@ -68,9 +79,15 @@ services:
     restart: always
     environment:
       FLASK_DEBUG: "0"
+    # two gunicorn workers at ~110 MB each, plus PDF rendering headroom
+    mem_limit: 768m
+    memswap_limit: 768m
 
   mysql:
     restart: always
+    # 128 MB buffer pool; observed ~390 MB RSS
+    mem_limit: 768m
+    memswap_limit: 768m
 
   solr:
     restart: always
@@ -78,6 +95,9 @@ services:
       # Solr's default heap is 512m; the production index is small but facet
       # queries over nine cores benefit from headroom on an 8 GB droplet.
       SOLR_HEAP: ${SOLR_HEAP:-1g}
+    # 1 GB heap (pre-touched) plus JVM off-heap; observed ~1.0 GB RSS
+    mem_limit: 1536m
+    memswap_limit: 1536m
 
 networks:
   edge:

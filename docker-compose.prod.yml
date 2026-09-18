@@ -54,6 +54,15 @@ services:
     # Only Caddy is reachable from outside; drop the base file's port mapping.
     ports: !reset []
     restart: always
+    # Caddy must not proxy to the bare service name "ui": Compose registers a
+    # service's own name as an alias on every network it joins, so the
+    # development site's ui answers to "ui" on dmtc-edge as well, and Caddy
+    # (on both networks) can resolve "ui" to the wrong stack. prod.caddy
+    # therefore targets this alias, which exists only on this project's network.
+    networks:
+      default:
+        aliases:
+          - ui-prod
 
   api:
     restart: always

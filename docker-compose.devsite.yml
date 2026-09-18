@@ -19,24 +19,39 @@ services:
       target: production
     ports: !reset []
     restart: always
+    mem_limit: 128m
+    memswap_limit: 128m
     networks:
       default:
       edge:
         aliases:
           - ui-devsite
 
+  # The development site is the softer tenant: memory limits as in production
+  # (see docker-compose.prod.yml) and, unlike production, CPU caps so a dev
+  # reindex or a runaway request cannot starve the production stack.
+
   api:
     restart: always
     environment:
       FLASK_DEBUG: "0"
+    cpus: 1
+    mem_limit: 768m
+    memswap_limit: 768m
 
   mysql:
     restart: always
+    cpus: 1
+    mem_limit: 768m
+    memswap_limit: 768m
 
   solr:
     restart: always
     environment:
       SOLR_HEAP: ${SOLR_HEAP:-768m}
+    cpus: 2
+    mem_limit: 1280m
+    memswap_limit: 1280m
 
 networks:
   edge:

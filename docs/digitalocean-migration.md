@@ -298,18 +298,55 @@ Notes from staging: the droplet's `dmtc-platform` checkout is on `devel`
 promoted; `.env.prod` has `TLS_MODE=internal` and must switch to `acme` at
 cutover; the ui image must be built with `target: production` (now pinned).
 
+Found 2026-09-18 while wiring ORCID: Caddy's production site block proxied to
+`ui:80`, but Compose registers a service's own name as an alias on *every*
+network it joins, so the development site's ui also answered to `ui` on
+`dmtc-edge`, and Caddy (a member of both networks) resolved `ui` to the dev
+site. Every www.dmtc-prod.org request was reaching the development stack. Fixed
+by giving the production ui a `ui-prod` alias on its own network
+(`docker-compose.prod.yml`) and pointing `caddy/sites/prod.caddy` at it; the
+Caddy container also had to be recreated because its bind mount of `caddy/tls`
+still referenced the directory inode from before the branch switch and showed
+it empty. Both sites verified separately afterwards (`/api/orcid_sign_in`
+returns each host's own callback base). ORCID client id and secret are now set
+in `.env.prod` and `.env.devsite` on the droplet (one production client, both
+callback URIs plus the legacy ESIP one registered).
+
+ORCID sign-in and logout verified end to end on both sites 2026-09-18. Two
+more API/UI defects surfaced and were fixed (uncommitted on the `devel`
+branches; applied by hand on the droplet's `main`/`master` checkouts):
+
+- `orcid_callback` rebuilt its redirect URI by replacing `request.host_url`
+  (`http://host/`, trailing slash) with `FRONT_END_URL` (no slash), sending
+  ORCID `https://www.dmtc-prod.orgapi/...` at token exchange and getting
+  `invalid_grant`. It now uses `ORCID_REDIRECT_URL + "/" + origin`, exactly
+  as `orcid_sign_in` does, and returns a 400/502 with ORCID's message instead
+  of a 500. This was the underlying cause of the sign-in 500 on the UNM host.
+- Logout failed with "Network Error": the UI called `/api/logout` without the
+  trailing slash, Flask's 308 redirect was built as `http://` (nginx overwrote
+  Caddy's `X-Forwarded-Proto` with its own `$scheme`), and the browser refused
+  the scheme change. Fixed three ways: ProxyFix in the API (`x_proto`,
+  `x_host`), nginx passing the upstream `X-Forwarded-Proto` through, and the
+  UI calling `/api/logout/`.
+
+Files modified on the droplet outside git (revert with `git checkout -- .`
+once promoted): dmtc-platform `docker-compose.prod.yml`,
+`caddy/sites/prod.caddy`; imls-dmt-api `dmtclearinghouse.py`; userinterface
+`ui/nginx.conf`, `ui/src/services/auth.service.js`.
+
 ## Still to do before cutover
 
 1. Delete orphaned droplet 601271964 in the DO console.
 2. Add kbene@karlbenedict.com to the DO team and repoint the four alert emails.
-3. ORCID: register a Public API client under the maintainer's own ORCID record
-   (see ORCID section), redirect URIs
-   `https://www.dmtc-prod.org/api/orcid_sign_in/orcid_callback/www.dmtc-prod.org`
-   and the `www.dmtc-devel.org` equivalent; put client id and secret in
-   `.env.prod` on the droplet; test sign-in on the staged host with a hosts-file
-   override.
-4. Promote `dmtc-platform` devel -> testing -> main (restore scripts, TLS mode,
-   ui build target, setup-prod.sh); then `git checkout main` on the droplet.
+3. ~~ORCID~~ Done 2026-09-18: one production client, three redirect URIs
+   (prod, devel, legacy ESIP), credentials in both env files, sign-in and
+   logout verified on both sites. Note for testing with a hosts-file override:
+   NordVPN's tunnel extension resolves DNS itself and ignores `/etc/hosts`;
+   disconnect it (or use Chrome's `--host-resolver-rules`) for the test.
+4. Promote the uncommitted fixes above (dmtc-platform, imls-dmt-api,
+   userinterface) devel -> testing -> main/master; then on the droplet
+   `git checkout -- .` in each repo and `git pull`, and rebuild with
+   `make prod-deploy` / `make devsite-deploy`.
 5. **Reset both stacks to the source data before cutover.** The staged
    production stack and the dev site have been used for testing (workflow
    changes, edits), so before DNS moves restore both from the 2026-09-16

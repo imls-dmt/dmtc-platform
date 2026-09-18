@@ -29,7 +29,7 @@
 	# Everything else: nginx in the ui container serves the SPA and proxies
 	# /api/ to the API. X-Forwarded-Host is what the API uses for the ORCID callback.
 	handle {
-		reverse_proxy ui:80 {
+		reverse_proxy ui-prod:80 {
 			header_up X-Forwarded-Host {host}
 			header_up X-Forwarded-Proto {scheme}
 		}

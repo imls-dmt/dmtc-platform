@@ -362,6 +362,28 @@ once promoted): dmtc-platform `docker-compose.prod.yml`,
 `caddy/sites/prod.caddy`; imls-dmt-api `dmtclearinghouse.py`; userinterface
 `ui/nginx.conf`, `ui/src/services/auth.service.js`.
 
+## Data notes (added 2026-10-21)
+
+- **Vocabularies live only in Solr.** The MySQL `taxonomies` table restored from
+  the UNM dump is a Drupal-era copy with different ids and names, and the
+  nightly backup synced only questions, question groups, surveys and answers.
+  `imls-dmt-api` now syncs taxonomies too (with pruning) and mirrors them into
+  MySQL before any reindex; until that API version is deployed, **do not run
+  `make prod-reindex` / `make devsite-reindex`**, which would rebuild the
+  taxonomies core from the legacy copy. The weekly droplet snapshot is the only
+  other copy of the current vocabularies.
+- **Dev-site Solr cores vanished on 2026-10-21** (every core directory had lost
+  its `core.properties`; index data intact). Re-running the init container
+  recreates the core definitions over the existing data:
+  `docker compose -p dmtc-devsite -f docker-compose.yml -f docker-compose.devsite.yml --env-file .env.devsite run --rm --no-deps solr-init`.
+- **`access_cost` changed from boolean to string** (`yes` / `no` / `n/a`) in
+  `solr/configsets/learningresources/conf/managed-schema`, with the matching
+  API and UI changes. Rollout order on each stack: pull this repository, restart
+  Solr so the refreshed configset is loaded (`docker compose ... restart solr`),
+  deploy the API, then `make <stack>-reindex` (needs an admin login), which
+  also rewrites legacy blob values in MySQL. The UI tolerates legacy values
+  until the reindex has run.
+
 ## Still to do before cutover
 
 1. ~~Delete orphaned droplet 601271964~~ Done 2026-09-18.

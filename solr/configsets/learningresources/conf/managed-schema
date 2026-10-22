@@ -455,7 +455,9 @@
   <field name="abstract_format" type="text_general" default="" multiValued="false" indexed="true" required="false" stored="true"/>
   <field name="accesibility_summary" type="text_general"/>
   <field name="access_conditions" type="text_general" default="" multiValued="false" indexed="true" required="false" stored="true"/>
-  <field name="access_cost" type="boolean" multiValued="false" indexed="true" required="false" stored="true"/>
+  <!-- Three-state "yes" / "no" / "n/a" since October 2026 (was boolean; userinterface #52, #78).
+       Changing the type requires a full reindex: make <stack>-reindex after restarting Solr. -->
+  <field name="access_cost" type="string" multiValued="false" indexed="true" required="false" stored="true"/>
   <field name="accessibility_features" type="text_general"/>
   <field name="accessibility_features.name" type="text_general" default="" multiValued="true" indexed="true" required="false" stored="true"/>
   <field name="accessibility_summary" type="text_general" default="" multiValued="false" indexed="true" required="false" stored="true"/>
@@ -494,7 +496,7 @@
   <field name="ed_frameworks.name" type="text_general" default="" multiValued="true" indexed="true" required="false" stored="true"/>
   <field name="ed_frameworks.nodes" type="text_general" default="" multiValued="true" indexed="true" required="false" stored="true"/>
   <field name="expertise_level" type="text_general" default="" multiValued="false" indexed="true" required="false" stored="true"/>
-  <field name="facet_access_cost" type="boolean" multiValued="false" indexed="true" required="false" stored="true"/>
+  <field name="facet_access_cost" type="string" multiValued="false" indexed="true" required="false" stored="true"/>
   <field name="facet_accessibility_features" type="text_general"/>
   <field name="facet_accessibility_features.name" type="string" multiValued="true" indexed="true" required="false" stored="true"/>
   <field name="facet_author_names" type="string" multiValued="true" indexed="true" required="false" stored="true"/>

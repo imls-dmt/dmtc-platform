@@ -89,7 +89,13 @@ cat > /etc/cron.d/dmtc-backup <<'CRON'
 CRON
 touch /var/log/dmtc-backup.log && chown dmtc:dmtc /var/log/dmtc-backup.log
 cat > /etc/logrotate.d/dmtc-backup <<'ROT'
-/var/log/dmtc-backup.log { weekly rotate 8 compress missingok notifempty }
+/var/log/dmtc-backup.log {
+    weekly
+    rotate 8
+    compress
+    missingok
+    notifempty
+}
 ROT
 
 echo "== done"

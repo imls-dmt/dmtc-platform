@@ -197,6 +197,17 @@ check to `/api/health` once that endpoint exists.
 | DMTC production API (Solr-backed) | `https://www.dmtc-prod.org/flask/api/resources/?id=b388173a-…` | down for 2 min; latency over 5 s for 10 min |
 | DMTC production UI | `https://www.dmtc-prod.org/` | down for 2 min; certificate expiring within 14 days |
 
+**Paused 2026-11-18.** Both checks had reported DOWN since mid-October although
+the UNM host answers: its Apache sends only the leaf certificate, and the
+certificate is issued by Let's Encrypt's new `YR2` intermediate under
+`ISRG Root YR`, which is not yet in Linux trust stores. Browsers repair the
+chain by fetching the intermediate; the DO probes, curl and Python do not, so
+every probe failed TLS verification. The fix is on the UNM side (serve the
+full chain) or the DNS cutover (Caddy serves full chains). Both checks were set
+`enabled: false` with `PUT /v2/uptime/checks/<id>` (`doctl monitoring uptime
+update` has no enabled flag); the alert rules were left in place. **Re-enable
+them at cutover** (step 6 below).
+
 Both checks run from `us_east` and `us_west`. To add a Slack channel:
 `doctl monitoring uptime alert update <alert-id> --slack-channels <name>
 --slack-urls <webhook>`. After the move, add droplet resource alerts
@@ -384,6 +395,15 @@ once promoted): dmtc-platform `docker-compose.prod.yml`,
   also rewrites legacy blob values in MySQL. The UI tolerates legacy values
   until the reindex has run.
 
+## Droplet changes applied by hand (added 2026-11-18)
+
+- `/etc/logrotate.d/dmtc-backup` was rewritten in multi-line form. The
+  provisioning script wrote the whole stanza on one line, which logrotate
+  rejects (`bad weekly directive`), so `logrotate.service` had been failing
+  every night at 00:00 on the droplet. The same fix is in
+  `dev-vm/setup-prod.sh`, so a re-provisioned host gets the correct file.
+  Backups themselves were unaffected.
+
 ## Still to do before cutover
 
 1. ~~Delete orphaned droplet 601271964~~ Done 2026-09-18.
@@ -419,8 +439,9 @@ once promoted): dmtc-platform `docker-compose.prod.yml`,
 6. Cutover: set `TLS_MODE=acme` in `.env.prod`, `make prod-up`; lower TTLs at
    Hover, then point A records for `dmtc-prod.org`, `www.dmtc-prod.org`,
    `dmtc-devel.org`, `www.dmtc-devel.org` at **134.199.249.40**; watch
-   `make prod-logs` for certificate issuance; confirm the uptime checks and
-   retarget the API check to `/api/health`.
+   `make prod-logs` for certificate issuance; re-enable the two uptime checks
+   (paused 2026-11-18, see Monitoring), confirm they go green, and retarget
+   the API check to `/api/health`.
 7. Dev site is already running (`make devsite-up`); it is reset in step 5.
 8. Run `make prod-backup` once by hand to create the Spaces bucket, then create
    a bucket-scoped key and delete the bootstrap key.
